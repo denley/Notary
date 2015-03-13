@@ -1,0 +1,25 @@
+apply plugin: 'com.android.application'
+
+android {
+    compileSdkVersion 22
+    buildToolsVersion "22.0.0"
+
+    defaultConfig {
+        applicationId project.PACKAGE_NAME + ".sample"
+        minSdkVersion 20
+        targetSdkVersion 22
+        versionCode project.VERSION_CODE
+        versionName project.VERSION_NAME
+    }
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+    }
+}
+
+dependencies {
+    compile project(':library')
+    compile 'com.google.android.support:wearable:1.1.0'
+}
