@@ -2,35 +2,81 @@ package me.denley.notary;
 
 import android.content.Context;
 import android.support.annotation.NonNull;
+import android.util.Pair;
 
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiClient;
 import com.google.android.gms.wearable.Wearable;
 
 import java.io.File;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 public class Notary {
 
-    public static void requestFileTransfer(@NonNull final Context context, @NonNull String sourceFile, @NonNull String sourceNode,
-                                           @NonNull String destinationDirectory, @NonNull String destinationNode,
-                                           boolean deleteSource) {
+    private static Map<FileListener, Pair<String, String>> LISTENERS = new LinkedHashMap<>();
+
+    public static void requestFileTransfer(@NonNull final Context context, @NonNull final String sourceFile, @NonNull final String sourceNode,
+                                           @NonNull final String destinationDirectory, @NonNull final String destinationNode,
+                                           final boolean deleteSource) {
         final FileTransaction transaction = new FileTransaction(sourceFile, sourceNode, destinationDirectory, destinationNode, deleteSource);
-        putTransaction(context, transaction);
+        putTransactionAsync(context, transaction);
     }
 
-    public static void requestFileDelete(@NonNull final Context context, @NonNull String file, @NonNull String node) {
+    public static void requestFileDelete(@NonNull final Context context, @NonNull final String file, @NonNull final String node) {
         final FileTransaction transaction = new FileTransaction(file, node);
-        putTransaction(context, transaction);
+        putTransactionAsync(context, transaction);
     }
 
-    public static void registerFileListener(@NonNull FileListener listener, @NonNull File fileOrDirectory, @NonNull String node) {
-
+    public static void registerFileListener(@NonNull final FileListener listener, @NonNull String fileOrDirectory, @NonNull String node) {
+        final Pair<String, String> target = new Pair<>(fileOrDirectory, node);
+        LISTENERS.put(listener, target);
     }
 
-    public static void unregisterFileListener(@NonNull FileListener listener) {
-
+    public static void unregisterFileListener(@NonNull final FileListener listener) {
+        LISTENERS.remove(listener);
     }
 
+    static void notifyListeners(@NonNull final FileTransaction transaction) {
+        for(Map.Entry<FileListener, Pair<String, String>> entry:LISTENERS.entrySet()) {
+            final Pair<String, String> target = entry.getValue();
+            checkAndTriggerListener(target.first, target.second, entry.getKey(), transaction);
+        }
+    }
+
+    private static void checkAndTriggerListener(@NonNull String fileOrDirectory, @NonNull String node,
+                                                @NonNull FileListener listener, @NonNull FileTransaction transaction) {
+
+        checkAndTriggerListenerForSource(fileOrDirectory, node, listener, transaction);
+        checkAndTriggerListenerForDestination(fileOrDirectory, node, listener, transaction);
+    }
+
+    private static void checkAndTriggerListenerForSource(@NonNull String fileOrDirectory, @NonNull String node,
+                                                         @NonNull FileListener listener, @NonNull FileTransaction transaction) {
+        if(!node.equals(transaction.sourceNode)) {
+            return;
+        }
+
+        final String sourceDirectory = new File(transaction.sourceFile).getParent();
+
+        if(fileOrDirectory.equalsIgnoreCase(transaction.sourceFile) || fileOrDirectory.equalsIgnoreCase(sourceDirectory)) {
+            listener.onSourceFileStatusChanged(transaction);
+        }
+    }
+
+    private static void checkAndTriggerListenerForDestination(@NonNull String fileOrDirectory, @NonNull String node,
+                                                              @NonNull FileListener listener, @NonNull FileTransaction transaction) {
+        if(!node.equals(transaction.destinationNode) || transaction.destinationDirectory==null) {
+            return;
+        }
+
+        final String sourceFileName = new File(transaction.sourceFile).getName();
+        final String destinationFileName = new File(transaction.destinationDirectory, sourceFileName).getAbsolutePath();
+
+        if(fileOrDirectory.equalsIgnoreCase(transaction.destinationDirectory) || fileOrDirectory.equalsIgnoreCase(destinationFileName)) {
+            listener.onDestinationFileStatusChanged(transaction);
+        }
+    }
 
     private static void putTransactionAsync(@NonNull final Context context, @NonNull final FileTransaction transaction) {
         new Thread() {
@@ -40,7 +86,7 @@ public class Notary {
         }.start();
     }
 
-    private static void putTransaction(@NonNull Context context, @NonNull FileTransaction transaction) {
+    private static void putTransaction(@NonNull final Context context, @NonNull final FileTransaction transaction) {
         final GoogleApiClient apiClient = new GoogleApiClient.Builder(context)
                 .addApi(Wearable.API)
                 .build();

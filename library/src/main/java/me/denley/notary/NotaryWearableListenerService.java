@@ -46,13 +46,14 @@ public class NotaryWearableListenerService extends WearableListenerService {
         final DataItem item = event.getDataItem();
 
         if(event.getType()!=DataEvent.TYPE_DELETED && localNode !=null && FileTransaction.isFileTransactionItem(item)) {
-            checkForActionables(item);
+            final FileTransaction transaction = new FileTransaction(item);
+
+            Notary.notifyListeners(transaction);
+            checkForActionables(transaction);
         }
     }
 
-    private void checkForActionables(final DataItem item) {
-        final FileTransaction transaction = new FileTransaction(item);
-
+    private void checkForActionables(final FileTransaction transaction) {
         if (transaction.pendingCopy()) {
             if(localNode.getId().equals(transaction.sourceNode)) {
                 loadSourceFile(transaction);

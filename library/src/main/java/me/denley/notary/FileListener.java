@@ -2,6 +2,8 @@ package me.denley.notary;
 
 public interface FileListener {
 
-    public void onFileTransactionStatusChanged(FileTransaction transaction);
+    public void onSourceFileStatusChanged(FileTransaction transaction);
+
+    public void onDestinationFileStatusChanged(FileTransaction transaction);
 
 }
