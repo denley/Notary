@@ -6,13 +6,20 @@ import android.util.Pair;
 
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiClient;
+import com.google.android.gms.wearable.MessageApi;
+import com.google.android.gms.wearable.MessageEvent;
 import com.google.android.gms.wearable.Wearable;
 
+import java.io.ByteArrayInputStream;
 import java.io.File;
+import java.io.ObjectInputStream;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
 public class Notary {
+
+    public static final String RESPONSE_LIST_FILES = "/response_list_files";
+    public static final String REQUEST_LIST_FILES = "/request_list_files";
 
     private static Map<FileListener, Pair<String, String>> LISTENERS = new LinkedHashMap<>();
 
@@ -94,6 +101,40 @@ public class Notary {
         final ConnectionResult result = apiClient.blockingConnect();
         if(result.isSuccess()) {
             Wearable.DataApi.putDataItem(apiClient, transaction.asPutDataRequest());
+        }
+    }
+
+
+
+
+    public interface FileListCallback {
+        public void success(FileListContainer fileList);
+        public void failure(ConnectionResult result);
+    }
+
+    public static void requestFileList(@NonNull final Context context, @NonNull final String node, @NonNull final String directory, @NonNull final FileListCallback callback) {
+        final GoogleApiClient apiClient = new GoogleApiClient.Builder(context)
+                .addApi(Wearable.API).build();
+
+        final ConnectionResult result = apiClient.blockingConnect();
+        if(result.isSuccess()) {
+            Wearable.MessageApi.addListener(apiClient, new MessageApi.MessageListener() {
+                @Override public void onMessageReceived(MessageEvent messageEvent) {
+                    if(messageEvent.getPath().equals(RESPONSE_LIST_FILES) && messageEvent.getSourceNodeId().equals(node)) {
+                        try {
+                            final ObjectInputStream in = new ObjectInputStream(new ByteArrayInputStream(messageEvent.getData()));
+                            final FileListContainer container = (FileListContainer)in.readObject();
+                            if(directory.equalsIgnoreCase(container.directory)) {
+                                callback.success(container);
+                                Wearable.MessageApi.removeListener(apiClient, this);
+                            }
+                        } catch (Exception e) {}
+                    }
+                }
+            });
+            Wearable.MessageApi.sendMessage(apiClient, node, REQUEST_LIST_FILES, directory.getBytes());
+        } else {
+            callback.failure(result);
         }
     }
 

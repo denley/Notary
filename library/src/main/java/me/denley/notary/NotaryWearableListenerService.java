@@ -1,6 +1,7 @@
 package me.denley.notary;
 
 import android.net.Uri;
+import android.support.annotation.NonNull;
 
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiClient;
@@ -8,20 +9,24 @@ import com.google.android.gms.wearable.Asset;
 import com.google.android.gms.wearable.DataEvent;
 import com.google.android.gms.wearable.DataEventBuffer;
 import com.google.android.gms.wearable.DataItem;
+import com.google.android.gms.wearable.MessageEvent;
 import com.google.android.gms.wearable.Node;
 import com.google.android.gms.wearable.PutDataRequest;
 import com.google.android.gms.wearable.Wearable;
 import com.google.android.gms.wearable.WearableListenerService;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.IOException;
 import java.io.InputStream;
+import java.io.ObjectOutputStream;
 
 public class NotaryWearableListenerService extends WearableListenerService {
 
     Node localNode;
 
-    @Override public void onDataChanged(DataEventBuffer dataEvents) {
+    @Override public void onDataChanged(@NonNull final DataEventBuffer dataEvents) {
         super.onDataChanged(dataEvents);
         initLocalNode();
 
@@ -42,7 +47,7 @@ public class NotaryWearableListenerService extends WearableListenerService {
         }
     }
 
-    private void onDataChanged(final DataEvent event) {
+    private void onDataChanged(@NonNull final DataEvent event) {
         final DataItem item = event.getDataItem();
 
         if(event.getType()!=DataEvent.TYPE_DELETED && localNode !=null && FileTransaction.isFileTransactionItem(item)) {
@@ -53,7 +58,7 @@ public class NotaryWearableListenerService extends WearableListenerService {
         }
     }
 
-    private void checkForActionables(final FileTransaction transaction) {
+    private void checkForActionables(@NonNull final FileTransaction transaction) {
         if (transaction.pendingCopy()) {
             if(localNode.getId().equals(transaction.sourceNode)) {
                 loadSourceFile(transaction);
@@ -69,7 +74,7 @@ public class NotaryWearableListenerService extends WearableListenerService {
         }
     }
 
-    private void loadSourceFile(final FileTransaction transaction) {
+    private void loadSourceFile(@NonNull final FileTransaction transaction) {
         final File file = new File(transaction.sourceFile);
 
         if(!file.exists() && file.isDirectory()) {
@@ -83,7 +88,7 @@ public class NotaryWearableListenerService extends WearableListenerService {
         updateTransaction(transaction);
     }
 
-    private void saveDestinationFile(final FileTransaction transaction) {
+    private void saveDestinationFile(@NonNull final FileTransaction transaction) {
         if(transaction.destinationDirectory==null) {
             transaction.status = FileTransaction.STATUS_FAILED_BAD_DESTINATION;
         } else {
@@ -122,7 +127,7 @@ public class NotaryWearableListenerService extends WearableListenerService {
         updateTransaction(transaction);
     }
 
-    private void deleteSourceFile(final FileTransaction transaction) {
+    private void deleteSourceFile(@NonNull final FileTransaction transaction) {
         final File file = new File(transaction.sourceFile);
 
         if(!file.exists()) {
@@ -136,7 +141,7 @@ public class NotaryWearableListenerService extends WearableListenerService {
         updateTransaction(transaction);
     }
 
-    private void updateTransaction(final FileTransaction transaction) {
+    private void updateTransaction(@NonNull final FileTransaction transaction) {
         final GoogleApiClient apiClient = new GoogleApiClient.Builder(this)
                 .addApi(Wearable.API).build();
 
@@ -157,7 +162,7 @@ public class NotaryWearableListenerService extends WearableListenerService {
         }
     }
 
-    private InputStream openAssetInputStream(Asset asset) {
+    private InputStream openAssetInputStream(@NonNull final Asset asset) {
         final GoogleApiClient apiClient = new GoogleApiClient.Builder(this)
                 .addApi(Wearable.API).build();
 
@@ -169,4 +174,49 @@ public class NotaryWearableListenerService extends WearableListenerService {
         }
     }
 
+
+    @Override public void onMessageReceived(@NonNull final MessageEvent messageEvent) {
+        super.onMessageReceived(messageEvent);
+
+        if(messageEvent.getPath().equals(Notary.REQUEST_LIST_FILES)) {
+            try {
+                final ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+                final ObjectOutputStream out = new ObjectOutputStream(bytes);
+                final File directory = new File(new String(messageEvent.getData()));
+                out.writeObject(createFileListResponse(directory));
+
+                sendMessage(messageEvent.getSourceNodeId(), Notary.RESPONSE_LIST_FILES, bytes.toByteArray());
+            }catch(IOException e) {}
+        }
+    }
+
+    private FileListContainer createFileListResponse(@NonNull final File directory) {
+        final FileListContainer response = new FileListContainer();
+        response.directory = directory.getAbsolutePath();
+
+        if(!directory.exists() || !directory.isDirectory()) {
+            response.outcome = FileListContainer.ERROR_DIRECTORY_NOT_FOUND;
+        } else {
+            final File[] contents = directory.listFiles();
+            response.files = new String[contents.length];
+            response.isDirectory = new boolean[contents.length];
+            for (int i = 0; i < contents.length; i++) {
+                response.files[i] = contents[i].getName();
+                response.isDirectory[i] = contents[i].isDirectory();
+            }
+        }
+
+        return response;
+    }
+
+    private void sendMessage(@NonNull final String node, @NonNull final String path, @NonNull final byte[] data) {
+        final GoogleApiClient apiClient = new GoogleApiClient.Builder(this)
+                .addApi(Wearable.API).build();
+        final ConnectionResult result = apiClient.blockingConnect();
+        if(result.isSuccess()) {
+            Wearable.MessageApi.sendMessage(apiClient, node, path, data);
+            apiClient.disconnect();
+
+        }
+    }
 }
