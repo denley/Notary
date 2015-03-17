@@ -15,8 +15,10 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
     }
+
 }
 
 dependencies {
     compile 'com.google.android.gms:play-services-wearable:6.5.87'
+    compile 'com.android.support:recyclerview-v7:22.0.0'
 }

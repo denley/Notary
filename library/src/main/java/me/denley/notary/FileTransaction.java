@@ -1,5 +1,7 @@
 package me.denley.notary;
 
+import android.content.Context;
+import android.os.Environment;
 import android.support.annotation.IntDef;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
@@ -16,7 +18,19 @@ import java.util.UUID;
 
 public class FileTransaction {
 
+    public static final String EXTERNAL_STORAGE_DIRECTORY = "~";
+
     private static final String PATH_PREFIX_TRANSACTION = "/notary_transaction_";
+
+    public static String normalizePath(@Nullable final String path) {
+        if(path==null) {
+            return null;
+        } else if(path.startsWith(EXTERNAL_STORAGE_DIRECTORY)) {
+            return Environment.getExternalStorageDirectory().getAbsolutePath() + path.substring(1);
+        }
+
+        return path;
+    }
 
     public static boolean isFileTransactionItem(DataItem item) {
         return item.getUri().getPath().startsWith(PATH_PREFIX_TRANSACTION);
@@ -28,7 +42,6 @@ public class FileTransaction {
 
     public static final int STATUS_IN_PROGRESS = 0;
     public static final int STATUS_COMPLETE = 1;
-    public static final int STATUS_PENDING_DISCONNECTED = 2;
     public static final int STATUS_CANCELED = 3;
     public static final int STATUS_FAILED_FILE_NOT_FOUND = 4;
     public static final int STATUS_FAILED_BAD_DESTINATION = 5;
@@ -40,7 +53,6 @@ public class FileTransaction {
     @IntDef({
             STATUS_IN_PROGRESS,
             STATUS_COMPLETE,
-            STATUS_PENDING_DISCONNECTED,
             STATUS_CANCELED,
             STATUS_FAILED_FILE_NOT_FOUND,
             STATUS_FAILED_BAD_DESTINATION,
@@ -52,11 +64,11 @@ public class FileTransaction {
     public @interface FileTransactionStatus {}
 
 
-    @NonNull final String sourceFile;
-    @NonNull final String sourceNode;
+    @NonNull private final String sourceFile;
+    @NonNull public final String sourceNode;
 
-    @Nullable final String destinationDirectory;
-    @Nullable final String destinationNode;
+    @Nullable private final String destinationDirectory;
+    @Nullable public final String destinationNode;
 
     private boolean shouldCopy = false;
     private boolean hasCopied = false;
@@ -69,7 +81,7 @@ public class FileTransaction {
 
     @Nullable Asset fileAsset;
 
-    FileTransaction(@NonNull String sourceFile, @NonNull String sourceNode, @NonNull String destinationDirectory, @NonNull String destinationNode, boolean deleteSource) {
+    FileTransaction(@NonNull String sourceFile, @NonNull String sourceNode, @Nullable String destinationDirectory, @NonNull String destinationNode, boolean deleteSource) {
         this.sourceFile = sourceFile;
         this.sourceNode = sourceNode;
         this.destinationDirectory = destinationDirectory;
@@ -118,7 +130,7 @@ public class FileTransaction {
         final DataMap map = request.getDataMap();
         map.putString("sourceFile", sourceFile);
         map.putString("sourceNode", sourceNode);
-        map.putString("destinationDirecectory", destinationDirectory);
+        map.putString("destinationDirectory", destinationDirectory);
         map.putString("destinationNode", destinationNode);
         map.putBoolean("shouldCopy", shouldCopy);
         map.putBoolean("hasCopied", hasCopied);
@@ -130,10 +142,6 @@ public class FileTransaction {
         map.putAsset("fileAsset", fileAsset);
 
         return request.asPutDataRequest();
-    }
-
-    public String getTransactionId() {
-        return transactionId;
     }
 
     @FileTransactionStatus public int getStatus() {
@@ -174,16 +182,35 @@ public class FileTransaction {
         return (!shouldCopy || hasCopied) && shouldDelete && !hasDeleted;
     }
 
+    boolean hasCopiedAndSaved() {
+        return shouldCopy & hasCopied;
+    }
+
+    boolean hasDeleted() {
+        return hasDeleted;
+    }
+
     private void updateStatus(@FileTransactionStatus int newStatus) {
         status = newStatus;
     }
 
-    String getDataApiPath() {
+    @NonNull String getDataApiPath() {
         return PATH_PREFIX_TRANSACTION + transactionId;
     }
 
-    public String getSourceFileName() {
-        return new File(sourceFile).getName();
+    @NonNull public String getSourceFileName() {
+        return getSourceFile().getName();
     }
 
+    @NonNull public File getSourceFile() {
+        return new File(normalizePath(sourceFile));
+    }
+
+    @NonNull public File getDestinationDirectoryFile(@NonNull Context context) {
+        if(destinationDirectory==null) {
+            return new File(Notary.getDefaultDirectory(context));
+        }
+
+        return new File(normalizePath(destinationDirectory));
+    }
 }

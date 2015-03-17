@@ -23,4 +23,5 @@ dependencies {
     wearApp project(':sample-wear')
     compile project(':library')
     compile 'com.android.support:appcompat-v7:22.0.0'
+    compile 'me.denley.courier:courier:1.0.0'
 }

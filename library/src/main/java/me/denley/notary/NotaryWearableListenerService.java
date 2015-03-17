@@ -1,7 +1,9 @@
 package me.denley.notary;
 
+import android.content.Context;
 import android.net.Uri;
 import android.support.annotation.NonNull;
+import android.support.annotation.Nullable;
 
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiClient;
@@ -9,6 +11,7 @@ import com.google.android.gms.wearable.Asset;
 import com.google.android.gms.wearable.DataEvent;
 import com.google.android.gms.wearable.DataEventBuffer;
 import com.google.android.gms.wearable.DataItem;
+import com.google.android.gms.wearable.DataItemBuffer;
 import com.google.android.gms.wearable.MessageEvent;
 import com.google.android.gms.wearable.Node;
 import com.google.android.gms.wearable.PutDataRequest;
@@ -24,36 +27,61 @@ import java.io.ObjectOutputStream;
 
 public class NotaryWearableListenerService extends WearableListenerService {
 
+    public static Node getLocalNode(final Context context) {
+        final GoogleApiClient apiClient = new GoogleApiClient.Builder(context)
+                .addApi(Wearable.API).build();
+
+        final ConnectionResult result = apiClient.blockingConnect();
+        if(result.isSuccess()) {
+            return Wearable.NodeApi.getLocalNode(apiClient).await().getNode();
+        } else {
+            throw new IllegalStateException("Unable to connect to wearable API");
+        }
+    }
+
+
     Node localNode;
+
+    @Override public void onPeerConnected(Node peer) {
+        super.onPeerConnected(peer);
+
+        final GoogleApiClient apiClient = new GoogleApiClient.Builder(this)
+                .addApi(Wearable.API).build();
+
+        final ConnectionResult result = apiClient.blockingConnect();
+        if(result.isSuccess()) {
+            final DataItemBuffer items = Wearable.DataApi.getDataItems(apiClient).await();
+            for (DataItem item : items) {
+                if(item.getData().length>0 && localNode !=null && FileTransaction.isFileTransactionItem(item)) {
+                    onTransactionDataItemChanged(item);
+                }
+            }
+            items.release();
+        }
+    }
 
     @Override public void onDataChanged(@NonNull final DataEventBuffer dataEvents) {
         super.onDataChanged(dataEvents);
-        initLocalNode();
+        localNode = getLocalNode(this);
 
         for(DataEvent event:dataEvents) {
             onDataChanged(event);
         }
     }
 
-    private void initLocalNode() {
-        final GoogleApiClient apiClient = new GoogleApiClient.Builder(this)
-                .addApi(Wearable.API).build();
-
-        final ConnectionResult result = apiClient.blockingConnect();
-        if(result.isSuccess()) {
-            localNode = Wearable.NodeApi.getLocalNode(apiClient).await().getNode();
-        } else {
-            throw new IllegalStateException("Unable to connect to wearable API");
-        }
-    }
-
     private void onDataChanged(@NonNull final DataEvent event) {
         final DataItem item = event.getDataItem();
 
-        if(event.getType()!=DataEvent.TYPE_DELETED && localNode !=null && FileTransaction.isFileTransactionItem(item)) {
-            final FileTransaction transaction = new FileTransaction(item);
+        if(event.getType()!=DataEvent.TYPE_DELETED && item.getData().length>0 && localNode !=null && FileTransaction.isFileTransactionItem(item)) {
+            onTransactionDataItemChanged(item);
+        }
+    }
 
-            Notary.notifyListeners(transaction);
+    private void onTransactionDataItemChanged(@NonNull final DataItem item) {
+        final FileTransaction transaction = new FileTransaction(item);
+        Notary.notifyListeners(this, transaction);
+
+        if(transaction.getStatus()==FileTransaction.STATUS_IN_PROGRESS) {
             checkForActionables(transaction);
         }
     }
@@ -75,9 +103,9 @@ public class NotaryWearableListenerService extends WearableListenerService {
     }
 
     private void loadSourceFile(@NonNull final FileTransaction transaction) {
-        final File file = new File(transaction.sourceFile);
+        final File file = transaction.getSourceFile();
 
-        if(!file.exists() && file.isDirectory()) {
+        if(!file.exists() || file.isDirectory()) {
             transaction.status = FileTransaction.STATUS_FAILED_FILE_NOT_FOUND;
         } else if(!file.canRead()) {
             transaction.status = FileTransaction.STATUS_FAILED_NO_READ_PERMISSION;
@@ -89,37 +117,33 @@ public class NotaryWearableListenerService extends WearableListenerService {
     }
 
     private void saveDestinationFile(@NonNull final FileTransaction transaction) {
-        if(transaction.destinationDirectory==null) {
+        final File directory = transaction.getDestinationDirectoryFile(this);
+
+        if (!directory.exists() || !directory.isDirectory()) {
             transaction.status = FileTransaction.STATUS_FAILED_BAD_DESTINATION;
         } else {
-            final File directory = new File(transaction.destinationDirectory);
+            final File file = new File(directory, transaction.getSourceFileName());
 
-            if (!directory.exists() || !directory.isDirectory()) {
-                transaction.status = FileTransaction.STATUS_FAILED_BAD_DESTINATION;
+            if(file.exists()) {
+                transaction.status = FileTransaction.STATUS_FAILED_FILE_ALREADY_EXISTS;
             } else {
-                final File file = new File(directory, transaction.getSourceFileName());
+                try {
+                    final InputStream in = openAssetInputStream(transaction.fileAsset);
+                    final FileOutputStream out = new FileOutputStream(file);
 
-                if(file.exists()) {
-                    transaction.status = FileTransaction.STATUS_FAILED_FILE_ALREADY_EXISTS;
-                } else {
-                    try {
-                        final InputStream in = openAssetInputStream(transaction.fileAsset);
-                        final FileOutputStream out = new FileOutputStream(file);
-
-                        final byte[] buffer = new byte[1024];
-                        int count;
-                        while ((count = in.read()) != -1) {
-                            out.write(buffer, 0, count);
-                        }
-
-                        out.flush();
-                        transaction.setHasCopied();
-
-                        in.close();
-                        out.close();
-                    } catch (Exception e) {
-                        transaction.status = FileTransaction.STATUS_FAILED_UNKNOWN;
+                    final byte[] buffer = new byte[1024];
+                    int count;
+                    while ((count = in.read(buffer)) != -1) {
+                        out.write(buffer, 0, count);
                     }
+
+                    out.flush();
+                    transaction.setHasCopied();
+
+                    in.close();
+                    out.close();
+                } catch (Exception e) {
+                    transaction.status = FileTransaction.STATUS_FAILED_UNKNOWN;
                 }
             }
         }
@@ -128,7 +152,7 @@ public class NotaryWearableListenerService extends WearableListenerService {
     }
 
     private void deleteSourceFile(@NonNull final FileTransaction transaction) {
-        final File file = new File(transaction.sourceFile);
+        final File file = transaction.getSourceFile();
 
         if(!file.exists()) {
             transaction.setHasDeleted();
@@ -179,25 +203,31 @@ public class NotaryWearableListenerService extends WearableListenerService {
         super.onMessageReceived(messageEvent);
 
         if(messageEvent.getPath().equals(Notary.REQUEST_LIST_FILES)) {
+            final byte[] data = messageEvent.getData();
+            final String requestedDirectory = data.length>0?new String(data):null;
+            final String usedDirectory = requestedDirectory!=null?FileTransaction.normalizePath(requestedDirectory):Notary.getDefaultDirectory(this);
+
             try {
                 final ByteArrayOutputStream bytes = new ByteArrayOutputStream();
                 final ObjectOutputStream out = new ObjectOutputStream(bytes);
-                final File directory = new File(new String(messageEvent.getData()));
-                out.writeObject(createFileListResponse(directory));
+
+                out.writeObject(createFileListResponse(usedDirectory, requestedDirectory));
 
                 sendMessage(messageEvent.getSourceNodeId(), Notary.RESPONSE_LIST_FILES, bytes.toByteArray());
             }catch(IOException e) {}
         }
     }
 
-    private FileListContainer createFileListResponse(@NonNull final File directory) {
-        final FileListContainer response = new FileListContainer();
-        response.directory = directory.getAbsolutePath();
+    private FileListContainer createFileListResponse(@NonNull final String usedDirectory, @Nullable final String requestedDirectory) {
+        final File directoryFile = new File(usedDirectory);
 
-        if(!directory.exists() || !directory.isDirectory()) {
+        final FileListContainer response = new FileListContainer();
+        response.directory = requestedDirectory;
+
+        if(!directoryFile.exists() || !directoryFile.isDirectory()) {
             response.outcome = FileListContainer.ERROR_DIRECTORY_NOT_FOUND;
         } else {
-            final File[] contents = directory.listFiles();
+            final File[] contents = directoryFile.listFiles();
             response.files = new String[contents.length];
             response.isDirectory = new boolean[contents.length];
             for (int i = 0; i < contents.length; i++) {
@@ -216,7 +246,6 @@ public class NotaryWearableListenerService extends WearableListenerService {
         if(result.isSuccess()) {
             Wearable.MessageApi.sendMessage(apiClient, node, path, data);
             apiClient.disconnect();
-
         }
     }
 }
