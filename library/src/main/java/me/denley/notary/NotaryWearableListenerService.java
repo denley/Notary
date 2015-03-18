@@ -120,8 +120,9 @@ public class NotaryWearableListenerService extends WearableListenerService {
 
     private void saveDestinationFile(@NonNull final FileTransaction transaction) {
         final File directory = transaction.getDestinationDirectoryFile(this);
+        directory.mkdirs();
 
-        if (!directory.exists() || !directory.isDirectory()) {
+        if (!directory.isDirectory()) {
             transaction.status = FileTransaction.STATUS_FAILED_BAD_DESTINATION;
         } else {
             assert transaction.fileAsset!=null;
@@ -253,10 +254,14 @@ public class NotaryWearableListenerService extends WearableListenerService {
         final FileListContainer response = new FileListContainer();
         response.directory = requestedDirectory;
 
-        if(!directoryFile.exists() || !directoryFile.isDirectory()) {
+        directoryFile.mkdirs();
+        if(!directoryFile.isDirectory()) {
             response.outcome = FileListContainer.ERROR_DIRECTORY_NOT_FOUND;
         } else {
-            final File[] contents = directoryFile.listFiles();
+            File[] contents = directoryFile.listFiles();
+            if(contents==null) {
+                contents = new File[0];
+            }
             response.files = new String[contents.length];
             response.isDirectory = new boolean[contents.length];
             for (int i = 0; i < contents.length; i++) {

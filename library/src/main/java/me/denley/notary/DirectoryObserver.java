@@ -5,6 +5,7 @@ import android.os.FileObserver;
 import android.os.Handler;
 import android.os.Looper;
 import android.support.annotation.NonNull;
+import android.support.annotation.Nullable;
 
 import com.google.android.gms.common.ConnectionResult;
 
@@ -25,12 +26,12 @@ public class DirectoryObserver implements FileListener {
 
     private String localNodeId;
 
-    private final boolean showSubDirectories;
+    @Nullable private final FileFilter fileFilter;
 
-    public DirectoryObserver(@NonNull final Context context, @NonNull final FileListAdapter adapter, @NonNull final String path, final boolean showSubDirectories) {
+    public DirectoryObserver(@NonNull final Context context, @NonNull final FileListAdapter adapter, @NonNull final String path, @Nullable final FileFilter fileFilter) {
         this.context = context;
         this.adapter = adapter;
-        this.showSubDirectories = showSubDirectories;
+        this.fileFilter = fileFilter;
         files = adapter.getFiles();
         observedPath = path;
 
@@ -62,10 +63,12 @@ public class DirectoryObserver implements FileListener {
     }
 
     private void loadInitialFileList() {
+        files.clear();
+
         final List<PendingFile> transactions = Notary.getTransactionsForDirectory(context, observedPath);
         for(PendingFile file:transactions) {
             if (file.transaction.getStatus()==FileTransaction.STATUS_IN_PROGRESS) {
-                if(showSubDirectories || !file.isDirectory) {
+                if(fileFilter==null || fileFilter.accept(file)) {
                     files.add(file);
                 }
             }
@@ -77,7 +80,7 @@ public class DirectoryObserver implements FileListener {
         }
         for(java.io.File localFile:directory.listFiles()) {
             final File file = new File(localFile);
-            if(showSubDirectories || !file.isDirectory) {
+            if(fileFilter==null || fileFilter.accept(file)) {
                 if (!files.contains(file)) {
                     files.add(file);
                 }
