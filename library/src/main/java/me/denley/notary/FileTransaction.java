@@ -33,7 +33,7 @@ public class FileTransaction {
         } else if(path.startsWith(EXTERNAL_STORAGE_DIRECTORY)) {
             return Environment.getExternalStorageDirectory().getAbsolutePath() + path.substring(1);
         } else if(path.startsWith(APP_PRIVATE_DIRECTORY)) {
-            return Environment.getDataDirectory().getAbsolutePath() + path.substring(1);
+            return context.getFilesDir().getAbsolutePath() + path.substring(1);
         } else if(path.startsWith(DEFAULT_DIRECTORY)) {
             return getDefaultDirectory(context) + path.substring(1);
         }

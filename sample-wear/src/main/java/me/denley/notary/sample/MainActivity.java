@@ -15,9 +15,10 @@ import me.denley.courier.Courier;
 import me.denley.courier.LocalNode;
 import me.denley.notary.DirectoryObserver;
 import me.denley.notary.File;
+import me.denley.notary.FileFilter;
 import me.denley.notary.FileTransaction;
 
-public class MainActivity extends Activity implements WearableListView.ClickListener {
+public class MainActivity extends Activity implements WearableListView.ClickListener, FileFilter {
 
     @LocalNode Node localNode;
 
@@ -46,13 +47,17 @@ public class MainActivity extends Activity implements WearableListView.ClickList
         directory.mkdir();
 
         if(!directory.isDirectory()) {
-            throw new RuntimeException("Unable to create sample directory");
+            throw new RuntimeException("Unable to create sample directory: "+directory.getAbsolutePath());
         }
 
         adapter = new MainActivityAdapter();
         list.setAdapter(adapter);
-        observer = new DirectoryObserver(this, adapter, directory.getAbsolutePath(), false);
+        observer = new DirectoryObserver(this, adapter, directory.getAbsolutePath(), null, this);
         list.setClickListener(this);
+    }
+
+    @Override public boolean accept(File file) {
+        return !file.isDirectory;
     }
 
     @Override public void onClick(WearableListView.ViewHolder viewHolder) {

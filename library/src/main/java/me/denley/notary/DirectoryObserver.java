@@ -14,24 +14,27 @@ import java.util.List;
 
 public class DirectoryObserver implements FileListener {
 
-    private final Context context;
+    @NonNull private final Context context;
 
-    private final FileListAdapter adapter;
-    private final List<File> files;
+    @NonNull private final FileListAdapter adapter;
+    @NonNull private final List<File> files;
 
-    private final String observedPath;
-    private final FileObserver fileSystemObserver;
+    @NonNull private final String observedPath;
+    @Nullable private final String externalObservedPathEncoded;
+    @NonNull private final FileObserver fileSystemObserver;
 
-    private final Handler handler = new Handler(Looper.getMainLooper());
+    @NonNull private final Handler handler = new Handler(Looper.getMainLooper());
 
-    private String localNodeId;
+    @NonNull private String localNodeId;
 
     @Nullable private final FileFilter fileFilter;
 
-    public DirectoryObserver(@NonNull final Context context, @NonNull final FileListAdapter adapter, @NonNull final String path, @Nullable final FileFilter fileFilter) {
+    public DirectoryObserver(@NonNull final Context context, @NonNull final FileListAdapter adapter,
+                             @NonNull final String path, @Nullable final String externalPathEncoded, @Nullable final FileFilter fileFilter) {
         this.context = context;
         this.adapter = adapter;
         this.fileFilter = fileFilter;
+        this.externalObservedPathEncoded = externalPathEncoded;
         files = adapter.getFiles();
         observedPath = path;
 
@@ -89,7 +92,7 @@ public class DirectoryObserver implements FileListener {
 
         displayUpdatedFileList();
 
-        Notary.requestFileList(context, new Notary.FileListCallback() {
+        Notary.requestFileList(context, externalObservedPathEncoded, new Notary.FileListCallback() {
             @Override public void success(FileListContainer fileList) {
                 if(fileList.outcome==FileListContainer.SUCCESS) {
                     for (String path : fileList.files) {

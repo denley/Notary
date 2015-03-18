@@ -23,13 +23,14 @@ import me.denley.courier.LocalNode;
 import me.denley.courier.RemoteNodes;
 import me.denley.notary.DirectoryObserver;
 import me.denley.notary.File;
+import me.denley.notary.FileFilter;
 import me.denley.notary.FileListAdapter;
 import me.denley.notary.FileTransaction;
 import me.denley.notary.Notary;
 import me.denley.notary.PendingFile;
 import me.denley.notary.SyncedFile;
 
-public class MainActivity extends ActionBarActivity {
+public class MainActivity extends ActionBarActivity implements FileFilter {
 
     private DirectoryObserver observer;
 
@@ -52,7 +53,7 @@ public class MainActivity extends ActionBarActivity {
 
         MainActivityAdapter adapter = new MainActivityAdapter();
         list.setAdapter(adapter);
-        observer = new DirectoryObserver(this, adapter, directory.getAbsolutePath(), false);
+        observer = new DirectoryObserver(this, adapter, directory.getAbsolutePath(), null, this);
 
         //purge();
     }
@@ -81,6 +82,11 @@ public class MainActivity extends ActionBarActivity {
         super.onDestroy();
         observer.stopObserving();
     }
+
+    @Override public boolean accept(File file) {
+        return !file.isDirectory;
+    }
+
 
     private class MainActivityAdapter extends FileListAdapter {
 

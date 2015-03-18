@@ -8,7 +8,7 @@
                  android:icon="@mipmap/ic_launcher"
                  android:theme="@android:style/Theme.DeviceDefault">
 
-        <meta-data android:name="default_path" android:value="~/Download" />
+        <meta-data android:name="default_path" android:value="!/Download" />
 
         <activity
             android:name=".MainActivity"
