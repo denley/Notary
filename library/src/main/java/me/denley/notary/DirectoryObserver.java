@@ -8,6 +8,7 @@ import android.support.annotation.NonNull;
 
 import com.google.android.gms.common.ConnectionResult;
 
+import java.util.Collections;
 import java.util.List;
 
 public class DirectoryObserver implements FileListener {
@@ -105,9 +106,8 @@ public class DirectoryObserver implements FileListener {
         });
     }
 
-    private void displayUpdatedFileList() {
-        // TODO sort files
-
+    private synchronized void displayUpdatedFileList() {
+        Collections.sort(files, File.SORT_ALPHABETICAL_DIRECTORIES_FIRST);
         handler.post(new Runnable(){
             public void run() {
                 adapter.notifyDataSetChanged();
@@ -119,35 +119,45 @@ public class DirectoryObserver implements FileListener {
         final File updatedFile = new File(observedPath, path);
 
         switch(event) {
-            case FileObserver.ACCESS:
             case FileObserver.MODIFY:
             case FileObserver.ATTRIB:
             case FileObserver.MOVED_TO:
-            case FileObserver.CREATE:
-                if(files.contains(updatedFile)) {
-                    final int position = files.indexOf(updatedFile);
-                    files.remove(position);
-                    files.add(position, updatedFile);
-                    adapter.notifyItemChanged(position);
+            case FileObserver.CREATE: {
+                final int position = files.indexOf(updatedFile);
+                if (position!=-1) {
+                    final File existing = files.get(position);
+
+                    if(existing instanceof SyncedFile) {
+                        files.remove(position);
+                        files.add(position, new SyncedFile(new java.io.File(observedPath, path)));
+                        adapter.notifyItemChanged(position);
+                    } else if(!(existing instanceof PendingFile)) {
+                        files.remove(position);
+                        files.add(position, updatedFile);
+                        adapter.notifyItemChanged(position);
+                    }
                 } else {
                     files.add(updatedFile);
                     adapter.notifyItemInserted(files.size() - 1);
                 }
                 break;
+            }
             case FileObserver.DELETE:
-            case FileObserver.MOVED_FROM:
-                if(files.contains(updatedFile)) {
-                    final int position = files.indexOf(updatedFile);
+            case FileObserver.MOVED_FROM: {
+                final int position = files.indexOf(updatedFile);
+                if (position != -1) {
                     files.remove(position);
                     adapter.notifyItemRemoved(position);
                 }
                 break;
+            }
             case FileObserver.DELETE_SELF:
-            case FileObserver.MOVE_SELF:
+            case FileObserver.MOVE_SELF: {
                 stopObserving();
                 files.clear();
                 adapter.notifyDataSetChanged();
                 break;
+            }
         }
     }
 
@@ -190,11 +200,14 @@ public class DirectoryObserver implements FileListener {
             file = new PendingFile(observedPath, transaction);
         }
 
-        if(files.contains(file)) {
-            final int position = files.indexOf(file);
-            files.remove(position);
+        final int position = files.indexOf(file);
+        if(position!=-1) {
+            final File existing = files.remove(position);
             files.add(position, file);
-            adapter.notifyItemChanged(position);
+
+            if(!file.getClass().equals(existing.getClass())) {
+                adapter.notifyItemChanged(position);
+            }
         } else if(!localNodeId.equals(transaction.sourceNode) || !transaction.hasDeleted()) {
             files.add(file);
             adapter.notifyItemInserted(files.size() - 1);
