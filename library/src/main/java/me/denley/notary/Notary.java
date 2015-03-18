@@ -140,7 +140,6 @@ public class Notary {
                     if(node.getId().equals(transaction.sourceNode)) {
                         files.add(new PendingFile(directory, transaction));
                     }
-                    // TODO Add non-failed transactions whose destination is here
                 }
             }
 

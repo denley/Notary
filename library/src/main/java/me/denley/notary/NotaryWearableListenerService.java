@@ -20,10 +20,12 @@ import com.google.android.gms.wearable.WearableListenerService;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.ObjectOutputStream;
+import java.util.Arrays;
 
 public class NotaryWearableListenerService extends WearableListenerService {
 
@@ -122,14 +124,26 @@ public class NotaryWearableListenerService extends WearableListenerService {
         if (!directory.exists() || !directory.isDirectory()) {
             transaction.status = FileTransaction.STATUS_FAILED_BAD_DESTINATION;
         } else {
+            assert transaction.fileAsset!=null;
             final File file = new File(directory, transaction.getSourceFileName());
 
             if(file.exists()) {
-                transaction.status = FileTransaction.STATUS_FAILED_FILE_ALREADY_EXISTS;
+                // File exists already.
+                // Compare them. If they are the same, count it as a success.
+                try {
+                    final InputStream assetIn = openAssetInputStream(transaction.fileAsset);
+                    final InputStream fileIn = new FileInputStream(file);
+
+                    if(streamEquals(assetIn, fileIn)) {
+                        transaction.setHasCopied();
+                    } else {
+                        transaction.status = FileTransaction.STATUS_FAILED_FILE_ALREADY_EXISTS;
+                    }
+                } catch (Exception e) {
+                    transaction.status = FileTransaction.STATUS_FAILED_UNKNOWN;
+                }
             } else {
                 try {
-                    assert transaction.fileAsset!=null;
-
                     final InputStream in = openAssetInputStream(transaction.fileAsset);
                     final FileOutputStream out = new FileOutputStream(file);
 
@@ -151,6 +165,19 @@ public class NotaryWearableListenerService extends WearableListenerService {
         }
 
         updateTransaction(transaction);
+    }
+
+    private boolean streamEquals(@NonNull InputStream in1, @NonNull InputStream in2) throws IOException {
+        final byte[] buffer1 = new byte[1024];
+        final byte[] buffer2 = new byte[1024];
+        int count;
+        while( (count = in1.read(buffer1)) != -1) {
+            if(in2.read(buffer2)!=count || !Arrays.equals(buffer1, buffer2) ) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private void deleteSourceFile(@NonNull final FileTransaction transaction) {
