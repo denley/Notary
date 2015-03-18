@@ -6,6 +6,7 @@ import android.support.v7.widget.RecyclerView;
 import android.support.wearable.view.WearableListView;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.WindowManager;
 import android.widget.TextView;
 
 import com.google.android.gms.wearable.Node;
@@ -14,7 +15,7 @@ import me.denley.courier.Courier;
 import me.denley.courier.LocalNode;
 import me.denley.notary.DirectoryObserver;
 import me.denley.notary.File;
-import me.denley.notary.Notary;
+import me.denley.notary.FileTransaction;
 
 public class MainActivity extends Activity implements WearableListView.ClickListener {
 
@@ -26,6 +27,7 @@ public class MainActivity extends Activity implements WearableListView.ClickList
 
     @Override protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         setContentView(R.layout.main);
         list = (WearableListView) findViewById(android.R.id.list);
 
@@ -40,7 +42,7 @@ public class MainActivity extends Activity implements WearableListView.ClickList
     }
 
     private void loadFiles() {
-        final java.io.File directory = new java.io.File(Notary.getDefaultDirectory(this));
+        final java.io.File directory = new java.io.File(FileTransaction.getDefaultDirectory(this));
         directory.mkdir();
 
         if(!directory.isDirectory()) {
@@ -49,7 +51,7 @@ public class MainActivity extends Activity implements WearableListView.ClickList
 
         adapter = new MainActivityAdapter();
         list.setAdapter(adapter);
-        observer = new DirectoryObserver(this, adapter, directory.getAbsolutePath());
+        observer = new DirectoryObserver(this, adapter, directory.getAbsolutePath(), false);
         list.setClickListener(this);
     }
 
@@ -63,7 +65,7 @@ public class MainActivity extends Activity implements WearableListView.ClickList
     private class MainActivityAdapter extends me.denley.notary.FileListAdapter {
 
         @Override public RecyclerView.ViewHolder onCreateViewHolder(ViewGroup viewGroup, int viewType) {
-            final View view = new TextView(MainActivity.this);
+            final View view = getLayoutInflater().inflate(R.layout.list_item, viewGroup, false);
             return new WearableListView.ViewHolder(view);
         }
 

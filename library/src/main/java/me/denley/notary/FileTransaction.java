@@ -1,6 +1,8 @@
 package me.denley.notary;
 
 import android.content.Context;
+import android.content.pm.ApplicationInfo;
+import android.content.pm.PackageManager;
 import android.os.Environment;
 import android.support.annotation.IntDef;
 import android.support.annotation.NonNull;
@@ -19,17 +21,41 @@ import java.util.UUID;
 public class FileTransaction {
 
     public static final String EXTERNAL_STORAGE_DIRECTORY = "~";
+    public static final String APP_PRIVATE_DIRECTORY = "!";
+    public static final String DEFAULT_DIRECTORY = "*";
+
 
     private static final String PATH_PREFIX_TRANSACTION = "/notary_transaction_";
 
-    public static String normalizePath(@Nullable final String path) {
+    public static String normalizePath(@NonNull final Context context, @Nullable final String path) {
         if(path==null) {
             return null;
         } else if(path.startsWith(EXTERNAL_STORAGE_DIRECTORY)) {
             return Environment.getExternalStorageDirectory().getAbsolutePath() + path.substring(1);
+        } else if(path.startsWith(APP_PRIVATE_DIRECTORY)) {
+            return Environment.getDataDirectory().getAbsolutePath() + path.substring(1);
+        } else if(path.startsWith(DEFAULT_DIRECTORY)) {
+            return getDefaultDirectory(context) + path.substring(1);
         }
 
         return path;
+    }
+
+    public static String getDefaultDirectory(@NonNull final Context context) {
+        final String encodedPath = getDefaultDirectoryEncoded(context);
+        if(encodedPath.startsWith(DEFAULT_DIRECTORY)) {
+            throw new IllegalArgumentException("Default directory references itself recursively.");
+        }
+        return normalizePath(context, encodedPath);
+    }
+
+    public static String getDefaultDirectoryEncoded(@NonNull final Context context) {
+        try {
+            final ApplicationInfo info = context.getPackageManager().getApplicationInfo(context.getPackageName(), PackageManager.GET_META_DATA);
+            return info.metaData.getString("default_path");
+        } catch(Exception e) {
+            throw new RuntimeException(e);
+        }
     }
 
     public static boolean isFileTransactionItem(DataItem item) {
@@ -67,13 +93,15 @@ public class FileTransaction {
     @NonNull private final String sourceFile;
     @NonNull public final String sourceNode;
 
-    @Nullable private final String destinationDirectory;
-    @Nullable public final String destinationNode;
+    @NonNull private final String destinationDirectory;
+    @NonNull public final String destinationNode;
 
     private boolean shouldCopy = false;
     private boolean hasCopied = false;
     private boolean shouldDelete = false;
     private boolean hasDeleted = false;
+
+    final boolean isDeleteOnlyTransaction;
 
     @FileTransactionStatus int status = STATUS_IN_PROGRESS;
 
@@ -81,7 +109,7 @@ public class FileTransaction {
 
     @Nullable Asset fileAsset;
 
-    FileTransaction(@NonNull String sourceFile, @NonNull String sourceNode, @Nullable String destinationDirectory, @NonNull String destinationNode, boolean deleteSource) {
+    FileTransaction(@NonNull String sourceFile, @NonNull String sourceNode, @NonNull String destinationDirectory, @NonNull String destinationNode, boolean deleteSource) {
         this.sourceFile = sourceFile;
         this.sourceNode = sourceNode;
         this.destinationDirectory = destinationDirectory;
@@ -91,18 +119,20 @@ public class FileTransaction {
         status = STATUS_IN_PROGRESS;
         transactionId = createTransactionId();
         fileAsset = null;
+        isDeleteOnlyTransaction = false;
     }
 
-    FileTransaction(@NonNull String fileToDelete, @NonNull String node) {
+    FileTransaction(@NonNull String observerDirectory, @NonNull String observerNode, @NonNull String fileToDelete, @NonNull String node) {
         sourceFile = fileToDelete;
         sourceNode = node;
-        destinationDirectory = null;
-        destinationNode = null;
+        destinationDirectory = observerDirectory;
+        destinationNode = observerNode;
         shouldCopy = false;
         shouldDelete = true;
         status = STATUS_IN_PROGRESS;
         transactionId = createTransactionId();
         fileAsset = null;
+        isDeleteOnlyTransaction = true;
     }
 
     FileTransaction(@NonNull DataItem item) {
@@ -122,6 +152,7 @@ public class FileTransaction {
         status = map.getInt("status");
         transactionId = map.getString("transactionId");
         fileAsset = map.getAsset("fileAsset");
+        isDeleteOnlyTransaction = map.getBoolean("isDeleteOnlyTransaction");
     }
 
     PutDataRequest asPutDataRequest() {
@@ -140,6 +171,7 @@ public class FileTransaction {
         map.putString("transactionId", transactionId);
 
         map.putAsset("fileAsset", fileAsset);
+        map.putBoolean("isDeleteOnlyTransaction", isDeleteOnlyTransaction);
 
         return request.asPutDataRequest();
     }
@@ -153,6 +185,7 @@ public class FileTransaction {
             throw new IllegalStateException("File was copied, but should not have been");
         }
         hasCopied = true;
+        fileAsset = null;
 
         if(!shouldDelete) {
             updateStatus(STATUS_COMPLETE);
@@ -199,18 +232,14 @@ public class FileTransaction {
     }
 
     @NonNull public String getSourceFileName() {
-        return getSourceFile().getName();
+        return new File(sourceFile).getName();
     }
 
-    @NonNull public File getSourceFile() {
-        return new File(normalizePath(sourceFile));
+    @NonNull public File getSourceFile(@NonNull final Context context) {
+        return new File(normalizePath(context, sourceFile));
     }
 
     @NonNull public File getDestinationDirectoryFile(@NonNull Context context) {
-        if(destinationDirectory==null) {
-            return new File(Notary.getDefaultDirectory(context));
-        }
-
-        return new File(normalizePath(destinationDirectory));
+        return new File(normalizePath(context, destinationDirectory));
     }
 }

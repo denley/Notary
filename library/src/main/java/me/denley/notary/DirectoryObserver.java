@@ -24,9 +24,12 @@ public class DirectoryObserver implements FileListener {
 
     private String localNodeId;
 
-    public DirectoryObserver(@NonNull final Context context, @NonNull final FileListAdapter adapter, @NonNull final String path) {
+    private final boolean showSubDirectories;
+
+    public DirectoryObserver(@NonNull final Context context, @NonNull final FileListAdapter adapter, @NonNull final String path, final boolean showSubDirectories) {
         this.context = context;
         this.adapter = adapter;
+        this.showSubDirectories = showSubDirectories;
         files = adapter.getFiles();
         observedPath = path;
 
@@ -61,7 +64,9 @@ public class DirectoryObserver implements FileListener {
         final List<PendingFile> transactions = Notary.getTransactionsForDirectory(context, observedPath);
         for(PendingFile file:transactions) {
             if (file.transaction.getStatus()==FileTransaction.STATUS_IN_PROGRESS) {
-                files.add(file);
+                if(showSubDirectories || !file.isDirectory) {
+                    files.add(file);
+                }
             }
         }
 
@@ -71,8 +76,10 @@ public class DirectoryObserver implements FileListener {
         }
         for(java.io.File localFile:directory.listFiles()) {
             final File file = new File(localFile);
-            if(!files.contains(file)) {
-                files.add(file);
+            if(showSubDirectories || !file.isDirectory) {
+                if (!files.contains(file)) {
+                    files.add(file);
+                }
             }
         }
 
@@ -156,6 +163,21 @@ public class DirectoryObserver implements FileListener {
         handler.post(new Runnable() {
             public void run() {
                 updateForTransaction(transaction);
+            }
+        });
+    }
+
+    @Override public void onDeleteTransactionSuccess(final FileTransaction transaction) {
+        handler.post(new Runnable() {
+            public void run() {
+                final File file = new File(observedPath, transaction.getSourceFileName());
+
+                if(files.contains(file)) {
+                    final int position = files.indexOf(file);
+                    files.remove(position);
+                    files.add(position, file);
+                    adapter.notifyItemChanged(position);
+                }
             }
         });
     }

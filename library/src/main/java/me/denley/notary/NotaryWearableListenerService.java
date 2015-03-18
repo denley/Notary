@@ -103,7 +103,7 @@ public class NotaryWearableListenerService extends WearableListenerService {
     }
 
     private void loadSourceFile(@NonNull final FileTransaction transaction) {
-        final File file = transaction.getSourceFile();
+        final File file = transaction.getSourceFile(this);
 
         if(!file.exists() || file.isDirectory()) {
             transaction.status = FileTransaction.STATUS_FAILED_FILE_NOT_FOUND;
@@ -128,6 +128,8 @@ public class NotaryWearableListenerService extends WearableListenerService {
                 transaction.status = FileTransaction.STATUS_FAILED_FILE_ALREADY_EXISTS;
             } else {
                 try {
+                    assert transaction.fileAsset!=null;
+
                     final InputStream in = openAssetInputStream(transaction.fileAsset);
                     final FileOutputStream out = new FileOutputStream(file);
 
@@ -152,7 +154,7 @@ public class NotaryWearableListenerService extends WearableListenerService {
     }
 
     private void deleteSourceFile(@NonNull final FileTransaction transaction) {
-        final File file = transaction.getSourceFile();
+        final File file = transaction.getSourceFile(this);
 
         if(!file.exists()) {
             transaction.setHasDeleted();
@@ -205,7 +207,7 @@ public class NotaryWearableListenerService extends WearableListenerService {
         if(messageEvent.getPath().equals(Notary.REQUEST_LIST_FILES)) {
             final byte[] data = messageEvent.getData();
             final String requestedDirectory = data.length>0?new String(data):null;
-            final String usedDirectory = requestedDirectory!=null?FileTransaction.normalizePath(requestedDirectory):Notary.getDefaultDirectory(this);
+            final String usedDirectory = requestedDirectory!=null?FileTransaction.normalizePath(this, requestedDirectory):FileTransaction.getDefaultDirectory(this);
 
             try {
                 final ByteArrayOutputStream bytes = new ByteArrayOutputStream();

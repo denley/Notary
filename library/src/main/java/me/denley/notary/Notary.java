@@ -1,8 +1,6 @@
 package me.denley.notary;
 
 import android.content.Context;
-import android.content.pm.ApplicationInfo;
-import android.content.pm.PackageManager;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.util.Log;
@@ -34,14 +32,15 @@ public class Notary {
     private static Map<FileListener, Pair<String, String>> LISTENERS = new LinkedHashMap<>();
 
     public static void requestFileTransfer(@NonNull final Context context, @NonNull final String sourceFile, @NonNull final String sourceNode,
-                                           @Nullable final String destinationDirectory, @NonNull final String destinationNode,
+                                           @NonNull final String destinationDirectory, @NonNull final String destinationNode,
                                            final boolean deleteSource) {
         final FileTransaction transaction = new FileTransaction(sourceFile, sourceNode, destinationDirectory, destinationNode, deleteSource);
         putTransactionAsync(context, transaction);
     }
 
-    public static void requestFileDelete(@NonNull final Context context, @NonNull final String file, @NonNull final String node) {
-        final FileTransaction transaction = new FileTransaction(file, node);
+    public static void requestFileDelete(@NonNull final Context context, @NonNull final String file, @NonNull final String node,
+                                         @NonNull String observerDirectory, @NonNull String observerNode) {
+        final FileTransaction transaction = new FileTransaction(observerDirectory, observerNode, file, node);
         putTransactionAsync(context, transaction);
     }
 
@@ -84,18 +83,19 @@ public class Notary {
                                                 @NonNull String fileOrDirectory, @NonNull String node,
                                                 @NonNull FileListener listener, @NonNull FileTransaction transaction) {
 
-        checkAndTriggerListenerForSource(fileOrDirectory, node, listener, transaction);
+        checkAndTriggerListenerForSource(context, fileOrDirectory, node, listener, transaction);
         checkAndTriggerListenerForDestination(context, fileOrDirectory, node, listener, transaction);
     }
 
-    private static void checkAndTriggerListenerForSource(@NonNull String fileOrDirectory, @NonNull String node,
+    private static void checkAndTriggerListenerForSource(@NonNull Context context,
+                                                         @NonNull String fileOrDirectory, @NonNull String node,
                                                          @NonNull FileListener listener, @NonNull FileTransaction transaction) {
         if(!node.equals(transaction.sourceNode)) {
             return;
         }
 
-        final String sourcePath = transaction.getSourceFile().getAbsolutePath();
-        final String sourceDirectory = transaction.getSourceFile().getParent();
+        final String sourcePath = transaction.getSourceFile(context).getAbsolutePath();
+        final String sourceDirectory = transaction.getSourceFile(context).getParent();
 
         if(fileOrDirectory.equalsIgnoreCase(sourcePath) || fileOrDirectory.equalsIgnoreCase(sourceDirectory)) {
             listener.onSourceFileStatusChanged(transaction);
@@ -107,7 +107,7 @@ public class Notary {
                                                               @NonNull FileListener listener, @NonNull FileTransaction transaction) {
         final File destinationDirectory = transaction.getDestinationDirectoryFile(context);
 
-        if(!node.equals(transaction.destinationNode) || destinationDirectory==null) {
+        if(!node.equals(transaction.destinationNode)) {
             return;
         }
 
@@ -115,7 +115,11 @@ public class Notary {
         final String destinationFileName = new File(destinationDirectory, sourceFileName).getAbsolutePath();
 
         if(fileOrDirectory.equalsIgnoreCase(destinationDirectory.getAbsolutePath()) || fileOrDirectory.equalsIgnoreCase(destinationFileName)) {
-            listener.onDestinationFileStatusChanged(transaction);
+            if(transaction.isDeleteOnlyTransaction && transaction.getStatus()==FileTransaction.STATUS_COMPLETE) {
+                listener.onDeleteTransactionSuccess(transaction);
+            } else {
+                listener.onDestinationFileStatusChanged(transaction);
+            }
         }
     }
 
@@ -211,19 +215,6 @@ public class Notary {
             }
         });
         Wearable.MessageApi.sendMessage(apiClient, node, REQUEST_LIST_FILES, directory!=null?directory.getBytes():new byte[0]);
-    }
-
-    public static String getDefaultDirectory(@NonNull Context context) {
-        return FileTransaction.normalizePath(getDefaultDirectoryEncoded(context));
-    }
-
-    public static String getDefaultDirectoryEncoded(@NonNull Context context) {
-        try {
-            final ApplicationInfo info = context.getPackageManager().getApplicationInfo(context.getPackageName(), PackageManager.GET_META_DATA);
-            return info.metaData.getString("default_path");
-        } catch(Exception e) {
-            throw new RuntimeException(e);
-        }
     }
 
 }

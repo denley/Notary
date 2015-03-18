@@ -6,4 +6,6 @@ public interface FileListener {
 
     public void onDestinationFileStatusChanged(FileTransaction transaction);
 
+    public void onDeleteTransactionSuccess(FileTransaction transaction);
+
 }

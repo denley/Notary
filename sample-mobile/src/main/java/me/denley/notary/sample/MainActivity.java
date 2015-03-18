@@ -40,7 +40,7 @@ public class MainActivity extends ActionBarActivity {
         super.onCreate(savedInstanceState);
         Courier.startReceiving(this);
 
-        final java.io.File directory = new java.io.File(Notary.getDefaultDirectory(this));
+        final java.io.File directory = new java.io.File(FileTransaction.getDefaultDirectory(this));
         directory.mkdir();
         if(!directory.isDirectory()) {
             throw new RuntimeException("Unable to load sample directory");
@@ -52,7 +52,7 @@ public class MainActivity extends ActionBarActivity {
 
         MainActivityAdapter adapter = new MainActivityAdapter();
         list.setAdapter(adapter);
-        observer = new DirectoryObserver(this, adapter, directory.getAbsolutePath());
+        observer = new DirectoryObserver(this, adapter, directory.getAbsolutePath(), false);
 
         //purge();
     }
@@ -101,40 +101,36 @@ public class MainActivity extends ActionBarActivity {
             } else if(file instanceof PendingFile) {
                 final PendingFile pendingFile = (PendingFile)file;
 
-                if(localNode.getId().equals(pendingFile.transaction.sourceNode)) {
-                    switch(pendingFile.transaction.getStatus()) {
-                        case FileTransaction.STATUS_IN_PROGRESS:
-                            icon.setImageResource(R.drawable.ic_action_sync);
-                            break;
-                        case FileTransaction.STATUS_COMPLETE:
-                            icon.setImageResource(R.drawable.ic_action_success);
-                            break;
-                        case FileTransaction.STATUS_FAILED_UNKNOWN:
-                        case FileTransaction.STATUS_FAILED_FILE_NOT_FOUND:
-                            icon.setImageResource(R.drawable.ic_action_sync_problem);
-                            break;
-                        case FileTransaction.STATUS_FAILED_BAD_DESTINATION:
-                            text.append("\nBad Destination");
-                            break;
-                        case FileTransaction.STATUS_FAILED_FILE_ALREADY_EXISTS:
-                            text.append("\nAlready Exists");
-                            break;
-                        case FileTransaction.STATUS_FAILED_NO_READ_PERMISSION:
-                            text.append("\nCan't Read");
-                            break;
-                        case FileTransaction.STATUS_FAILED_NO_DELETE_PERMISSION:
-                            text.append("\nCan't Delete");
-                            break;
-                        case FileTransaction.STATUS_CANCELED:
-                            if(file.isDirectory) {
-                                icon.setImageResource(R.drawable.ic_action_folder);
-                            } else {
-                                icon.setImageResource(R.drawable.ic_action_file);
-                            }
-                            break;
-                    }
-                } else {
-                    throw new IllegalStateException("List should only have transactions relevant to the local device");
+                switch(pendingFile.transaction.getStatus()) {
+                    case FileTransaction.STATUS_IN_PROGRESS:
+                        icon.setImageResource(R.drawable.ic_action_sync);
+                        break;
+                    case FileTransaction.STATUS_COMPLETE:
+                        icon.setImageResource(R.drawable.ic_action_success);
+                        break;
+                    case FileTransaction.STATUS_FAILED_UNKNOWN:
+                    case FileTransaction.STATUS_FAILED_FILE_NOT_FOUND:
+                        icon.setImageResource(R.drawable.ic_action_sync_problem);
+                        break;
+                    case FileTransaction.STATUS_FAILED_BAD_DESTINATION:
+                        text.append("\nBad Destination");
+                        break;
+                    case FileTransaction.STATUS_FAILED_FILE_ALREADY_EXISTS:
+                        text.append("\nAlready Exists");
+                        break;
+                    case FileTransaction.STATUS_FAILED_NO_READ_PERMISSION:
+                        text.append("\nCan't Read");
+                        break;
+                    case FileTransaction.STATUS_FAILED_NO_DELETE_PERMISSION:
+                        text.append("\nCan't Delete");
+                        break;
+                    case FileTransaction.STATUS_CANCELED:
+                        if(file.isDirectory) {
+                            icon.setImageResource(R.drawable.ic_action_folder);
+                        } else {
+                            icon.setImageResource(R.drawable.ic_action_file);
+                        }
+                        break;
                 }
             } else {
                 if(file.isDirectory) {
@@ -151,11 +147,17 @@ public class MainActivity extends ActionBarActivity {
                     } else if(file instanceof PendingFile) {
                         // TODO cancel transaction
                     } else if(file instanceof SyncedFile) {
-                        // TODO delete remote file
+                        final String fileName = new java.io.File(file.path).getName();
+                        final String remotePath = FileTransaction.DEFAULT_DIRECTORY+"/"+fileName;
+
+                        Notary.requestFileDelete(
+                                MainActivity.this,
+                                remotePath, remoteNodes.get(0).getId(),
+                                FileTransaction.DEFAULT_DIRECTORY, localNode.getId());
                     } else {
                         Notary.requestFileTransfer(MainActivity.this,
                                 file.path, localNode.getId(),
-                                null, remoteNodes.get(0).getId(),
+                                FileTransaction.DEFAULT_DIRECTORY, remoteNodes.get(0).getId(),
                                 false);
                     }
                 }
