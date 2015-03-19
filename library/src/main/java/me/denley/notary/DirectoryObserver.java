@@ -265,8 +265,10 @@ public class DirectoryObserver implements FileListener {
                 adapter.notifyItemChanged(position);
             }
         } else if(!localNodeId.equals(transaction.sourceNode) || !transaction.hasDeleted()) {
-            files.add(file);
-            adapter.notifyItemInserted(files.size() - 1);
+            if(fileFilter==null || fileFilter.display(file)) {
+                files.add(file);
+                adapter.notifyItemInserted(files.size() - 1);
+            }
         }
     }
 
