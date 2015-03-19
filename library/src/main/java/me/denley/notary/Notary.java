@@ -136,8 +136,9 @@ public class Notary {
             for(DataItem item:items) {
                 if(item.getData().length>0 && FileTransaction.isFileTransactionItem(item)) {
                     final FileTransaction transaction = new FileTransaction(item);
+                    final String sourceDirectory = transaction.getSourceFile(context).getParent();
 
-                    if(node.getId().equals(transaction.sourceNode)) {
+                    if(node.getId().equals(transaction.sourceNode) && directory.equalsIgnoreCase(sourceDirectory)) {
                         files.add(new PendingFile(directory, transaction));
                     }
                 }
