@@ -149,8 +149,10 @@ public class DirectoryObserver implements FileListener {
             final String remoteNodeId = remoteNodes.get(0).getId();
 
             for (File file : files) {
-                if (file.getClass() == File.class) { // file is not syncing, nor synced
-                    Notary.requestFileTransfer(context, file.path, localNodeId, externalObservedPathEncoded, remoteNodeId, false);
+                if (!file.isDirectory && file.getClass()==File.class) { // file is not syncing, nor synced
+                    if(fileFilter==null || fileFilter.autoSync(file)) {
+                        Notary.requestFileTransfer(context, file.path, localNodeId, externalObservedPathEncoded, remoteNodeId, false);
+                    }
                 }
             }
         }
