@@ -26,11 +26,13 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.ObjectOutputStream;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 
 public class NotaryWearableListenerService extends WearableListenerService {
 
-    public static Node getLocalNode(final Context context) {
+    @Nullable public static Node getLocalNode(final Context context) {
         final GoogleApiClient apiClient = new GoogleApiClient.Builder(context)
                 .addApi(Wearable.API).build();
 
@@ -38,7 +40,19 @@ public class NotaryWearableListenerService extends WearableListenerService {
         if(result.isSuccess()) {
             return Wearable.NodeApi.getLocalNode(apiClient).await().getNode();
         } else {
-            throw new IllegalStateException("Unable to connect to wearable API");
+            return null;
+        }
+    }
+
+    @NonNull public static List<Node> getRemoteNodes(final Context context) {
+        final GoogleApiClient apiClient = new GoogleApiClient.Builder(context)
+                .addApi(Wearable.API).build();
+
+        final ConnectionResult result = apiClient.blockingConnect();
+        if(result.isSuccess()) {
+            return Wearable.NodeApi.getConnectedNodes(apiClient).await().getNodes();
+        } else {
+            return new ArrayList<>();
         }
     }
 

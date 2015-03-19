@@ -8,6 +8,7 @@ import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 
 import com.google.android.gms.common.ConnectionResult;
+import com.google.android.gms.wearable.Node;
 
 import java.util.Collections;
 import java.util.Comparator;
@@ -21,26 +22,26 @@ public class DirectoryObserver implements FileListener {
     @NonNull private final List<File> files;
 
     @NonNull private final String observedPath;
-    @Nullable private final String externalObservedPathEncoded;
+    @NonNull private final String externalObservedPathEncoded;
     @NonNull private final FileObserver fileSystemObserver;
 
     @NonNull private final Handler handler = new Handler(Looper.getMainLooper());
 
     @NonNull private String localNodeId;
 
-    @Nullable private final FileFilter fileFilter;
+    @Nullable private final SyncableFileFilter fileFilter;
     @Nullable private final Comparator<File> sorter;
 
     private boolean hasSyncedState = false;
 
     public DirectoryObserver(@NonNull final Context context, @NonNull final FileListAdapter adapter,
                              @NonNull final String path, @Nullable final String externalPathEncoded,
-                             @Nullable final FileFilter fileFilter, @Nullable final Comparator<File> sorter) {
+                             @Nullable final SyncableFileFilter fileFilter, @Nullable final Comparator<File> sorter) {
         this.context = context;
         this.adapter = adapter;
         this.fileFilter = fileFilter;
         this.sorter = sorter;
-        this.externalObservedPathEncoded = externalPathEncoded;
+        this.externalObservedPathEncoded = externalPathEncoded!=null?externalPathEncoded:FileTransaction.DEFAULT_DIRECTORY;
         files = adapter.getFiles();
         observedPath = path;
 
@@ -58,7 +59,8 @@ public class DirectoryObserver implements FileListener {
 
         new Thread() {
             public void run() {
-                localNodeId = NotaryWearableListenerService.getLocalNode(context).getId();
+                final Node localNode = NotaryWearableListenerService.getLocalNode(context);
+                localNodeId = localNode==null?"":localNode.getId();
                 loadInitialFileList();
                 fileSystemObserver.startWatching();
                 Notary.registerFileListener(DirectoryObserver.this, path, localNodeId);
@@ -71,6 +73,7 @@ public class DirectoryObserver implements FileListener {
         Notary.unregisterFileListener(this);
     }
 
+    @SuppressWarnings("unused")
     public boolean hasSyncedWithRemoteDevice() {
         return hasSyncedState;
     }
@@ -81,7 +84,7 @@ public class DirectoryObserver implements FileListener {
         final List<PendingFile> transactions = Notary.getTransactionsForDirectory(context, observedPath);
         for(PendingFile file:transactions) {
             if (file.transaction.getStatus()==FileTransaction.STATUS_IN_PROGRESS) {
-                if(fileFilter==null || fileFilter.accept(file)) {
+                if(fileFilter==null || fileFilter.display(file)) {
                     files.add(file);
                 }
             }
@@ -93,7 +96,7 @@ public class DirectoryObserver implements FileListener {
         }
         for(java.io.File localFile:directory.listFiles()) {
             final File file = new File(localFile);
-            if(fileFilter==null || fileFilter.accept(file)) {
+            if(fileFilter==null || fileFilter.display(file)) {
                 if (!files.contains(file)) {
                     files.add(file);
                 }
@@ -115,6 +118,8 @@ public class DirectoryObserver implements FileListener {
                             files.add(position, syncedFile);
                         }
                     }
+
+                    doAutoSync();
                 }
 
                 hasSyncedState = true;
@@ -136,6 +141,19 @@ public class DirectoryObserver implements FileListener {
                 adapter.notifyDataSetChanged();
             }
         });
+    }
+
+    private void doAutoSync() {
+        final List<Node> remoteNodes = NotaryWearableListenerService.getRemoteNodes(context);
+        if(!remoteNodes.isEmpty()) {
+            final String remoteNodeId = remoteNodes.get(0).getId();
+
+            for (File file : files) {
+                if (file.getClass() == File.class) { // file is not syncing, nor synced
+                    Notary.requestFileTransfer(context, file.path, localNodeId, externalObservedPathEncoded, remoteNodeId, false);
+                }
+            }
+        }
     }
 
     private synchronized void onFileSystemEvent(int event, String path) {

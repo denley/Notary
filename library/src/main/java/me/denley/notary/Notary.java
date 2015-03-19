@@ -2,7 +2,6 @@ package me.denley.notary;
 
 import android.content.Context;
 import android.support.annotation.NonNull;
-import android.support.annotation.Nullable;
 import android.util.Log;
 import android.util.Pair;
 
@@ -138,7 +137,7 @@ public class Notary {
                     final FileTransaction transaction = new FileTransaction(item);
                     final String sourceDirectory = transaction.getSourceFile(context).getParent();
 
-                    if(node.getId().equals(transaction.sourceNode) && directory.equalsIgnoreCase(sourceDirectory)) {
+                    if(node!=null && node.getId().equals(transaction.sourceNode) && directory.equalsIgnoreCase(sourceDirectory)) {
                         files.add(new PendingFile(directory, transaction));
                     }
                 }
@@ -160,10 +159,10 @@ public class Notary {
     }
 
     public static void requestFileList(@NonNull final Context context, @NonNull final FileListCallback callback) {
-        requestFileList(context, null, callback);
+        requestFileList(context, FileTransaction.DEFAULT_DIRECTORY, callback);
     }
 
-    public static void requestFileList(@NonNull final Context context, @Nullable final String directory, @NonNull final FileListCallback callback) {
+    public static void requestFileList(@NonNull final Context context, @NonNull final String directory, @NonNull final FileListCallback callback) {
         final GoogleApiClient apiClient = new GoogleApiClient.Builder(context)
                 .addApi(Wearable.API).build();
 
@@ -182,7 +181,7 @@ public class Notary {
         }
     }
 
-    public static void requestFileList(@NonNull final Context context, @NonNull final String node, @Nullable final String directory, @NonNull final FileListCallback callback) {
+    public static void requestFileList(@NonNull final Context context, @NonNull final String node, @NonNull final String directory, @NonNull final FileListCallback callback) {
         final GoogleApiClient apiClient = new GoogleApiClient.Builder(context)
                 .addApi(Wearable.API).build();
 
@@ -195,7 +194,7 @@ public class Notary {
         }
     }
 
-    private static void requestFileList(@NonNull final GoogleApiClient apiClient, @NonNull final String node, @Nullable final String directory, @NonNull final FileListCallback callback) {
+    private static void requestFileList(@NonNull final GoogleApiClient apiClient, @NonNull final String node, @NonNull final String directory, @NonNull final FileListCallback callback) {
         Wearable.MessageApi.addListener(apiClient, new MessageApi.MessageListener() {
             @Override public void onMessageReceived(MessageEvent messageEvent) {
                 if(messageEvent.getPath().equals(RESPONSE_LIST_FILES) && messageEvent.getSourceNodeId().equals(node)) {
@@ -203,7 +202,7 @@ public class Notary {
                     try {
                         final ObjectInputStream in = new ObjectInputStream(new ByteArrayInputStream(messageEvent.getData()));
                         final FileListContainer container = (FileListContainer)in.readObject();
-                        if((directory==null && container.directory==null) || (directory!=null && directory.equalsIgnoreCase(container.directory))) {
+                        if((directory.equalsIgnoreCase(container.directory))) {
                             Log.d("WearApi", "File list success");
                             callback.success(container);
                             Wearable.MessageApi.removeListener(apiClient, this);
@@ -214,7 +213,7 @@ public class Notary {
                 }
             }
         });
-        Wearable.MessageApi.sendMessage(apiClient, node, REQUEST_LIST_FILES, directory!=null?directory.getBytes():new byte[0]);
+        Wearable.MessageApi.sendMessage(apiClient, node, REQUEST_LIST_FILES, directory.getBytes());
     }
 
 }

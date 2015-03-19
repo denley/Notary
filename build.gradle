@@ -21,6 +21,6 @@ allprojects {
 ext {
     PACKAGE_NAME = 'me.denley.notary'
     ARTIFACT_NAME = 'notary'
-    VERSION_CODE = 6
-    VERSION_NAME = '0.1.5'
+    VERSION_CODE = 7
+    VERSION_NAME = '0.1.6'
 }

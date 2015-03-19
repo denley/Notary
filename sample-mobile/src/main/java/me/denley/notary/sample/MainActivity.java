@@ -23,14 +23,14 @@ import me.denley.courier.LocalNode;
 import me.denley.courier.RemoteNodes;
 import me.denley.notary.DirectoryObserver;
 import me.denley.notary.File;
-import me.denley.notary.FileFilter;
 import me.denley.notary.FileListAdapter;
 import me.denley.notary.FileTransaction;
 import me.denley.notary.Notary;
 import me.denley.notary.PendingFile;
+import me.denley.notary.SyncableFileFilter;
 import me.denley.notary.SyncedFile;
 
-public class MainActivity extends ActionBarActivity implements FileFilter {
+public class MainActivity extends ActionBarActivity implements SyncableFileFilter {
 
     private DirectoryObserver observer;
 
@@ -83,8 +83,12 @@ public class MainActivity extends ActionBarActivity implements FileFilter {
         observer.stopObserving();
     }
 
-    @Override public boolean accept(File file) {
+    @Override public boolean display(File file) {
         return !file.isDirectory;
+    }
+
+    @Override public boolean autoSync(File file) {
+        return false;
     }
 
 

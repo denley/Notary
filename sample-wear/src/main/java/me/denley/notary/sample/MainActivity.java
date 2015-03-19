@@ -15,10 +15,10 @@ import me.denley.courier.Courier;
 import me.denley.courier.LocalNode;
 import me.denley.notary.DirectoryObserver;
 import me.denley.notary.File;
-import me.denley.notary.FileFilter;
 import me.denley.notary.FileTransaction;
+import me.denley.notary.SyncableFileFilter;
 
-public class MainActivity extends Activity implements WearableListView.ClickListener, FileFilter {
+public class MainActivity extends Activity implements WearableListView.ClickListener, SyncableFileFilter {
 
     @LocalNode Node localNode;
 
@@ -56,8 +56,12 @@ public class MainActivity extends Activity implements WearableListView.ClickList
         list.setClickListener(this);
     }
 
-    @Override public boolean accept(File file) {
+    @Override public boolean display(File file) {
         return !file.isDirectory;
+    }
+
+    @Override public boolean autoSync(File file) {
+        return false;
     }
 
     @Override public void onClick(WearableListView.ViewHolder viewHolder) {

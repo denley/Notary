@@ -4,6 +4,7 @@ import android.support.annotation.NonNull;
 
 import java.util.Comparator;
 
+@SuppressWarnings("unused")
 public class File {
 
     public static Comparator<File> SORT_ALPHABETICAL = new Comparator<File>() {
@@ -47,8 +48,22 @@ public class File {
     public final boolean canRead;
     public final boolean canWrite;
 
+    @NonNull public java.io.File getIoFile() {
+        return new java.io.File(path);
+    }
+
     public String getName() {
-        return new java.io.File(path).getName();
+        return getIoFile().getName();
+    }
+
+    @NonNull public String getFileSuffix(){
+        final String name = getName();
+        final int dotPos = name.lastIndexOf(".");
+        if(dotPos==-1) {
+            return "";
+        } else {
+            return name.substring(dotPos + 1);
+        }
     }
 
     @Override public boolean equals(Object o) {
