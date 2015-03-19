@@ -10,6 +10,7 @@ import android.support.annotation.Nullable;
 import com.google.android.gms.common.ConnectionResult;
 
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 
 public class DirectoryObserver implements FileListener {
@@ -28,12 +29,17 @@ public class DirectoryObserver implements FileListener {
     @NonNull private String localNodeId;
 
     @Nullable private final FileFilter fileFilter;
+    @Nullable private final Comparator<File> sorter;
+
+    private boolean hasSyncedState = false;
 
     public DirectoryObserver(@NonNull final Context context, @NonNull final FileListAdapter adapter,
-                             @NonNull final String path, @Nullable final String externalPathEncoded, @Nullable final FileFilter fileFilter) {
+                             @NonNull final String path, @Nullable final String externalPathEncoded,
+                             @Nullable final FileFilter fileFilter, @Nullable final Comparator<File> sorter) {
         this.context = context;
         this.adapter = adapter;
         this.fileFilter = fileFilter;
+        this.sorter = sorter;
         this.externalObservedPathEncoded = externalPathEncoded;
         files = adapter.getFiles();
         observedPath = path;
@@ -63,6 +69,10 @@ public class DirectoryObserver implements FileListener {
     public void stopObserving() {
         fileSystemObserver.stopWatching();
         Notary.unregisterFileListener(this);
+    }
+
+    public boolean hasSyncedWithRemoteDevice() {
+        return hasSyncedState;
     }
 
     private void loadInitialFileList() {
@@ -106,14 +116,21 @@ public class DirectoryObserver implements FileListener {
                         }
                     }
                 }
+
+                hasSyncedState = true;
                 displayUpdatedFileList();
             }
-            @Override public void failure(ConnectionResult result) { }
+            @Override public void failure(ConnectionResult result) {
+                hasSyncedState = true;
+                displayUpdatedFileList();
+            }
         });
     }
 
     private synchronized void displayUpdatedFileList() {
-        Collections.sort(files, File.SORT_ALPHABETICAL_DIRECTORIES_FIRST);
+        if(sorter!=null) {
+            Collections.sort(files, sorter);
+        }
         handler.post(new Runnable(){
             public void run() {
                 adapter.notifyDataSetChanged();
