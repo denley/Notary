@@ -10,6 +10,7 @@ import android.support.annotation.Nullable;
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.wearable.Node;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
@@ -20,6 +21,7 @@ public class DirectoryObserver implements FileListener {
 
     @NonNull private final FileListAdapter adapter;
     @NonNull private final List<File> files;
+    @NonNull private final List<File> autoSyncFiles = new ArrayList<>();
 
     @NonNull private final String observedPath;
     @NonNull private final String externalObservedPathEncoded;
@@ -101,6 +103,15 @@ public class DirectoryObserver implements FileListener {
                     files.add(file);
                 }
             }
+            if(fileFilter!=null && fileFilter.autoSync(file)) {
+                autoSyncFiles.add(file);
+            }
+        }
+
+        for(PendingFile file:transactions) {
+            if (file.transaction.getStatus()==FileTransaction.STATUS_IN_PROGRESS) {
+                autoSyncFiles.remove(file);
+            }
         }
 
         displayUpdatedFileList();
@@ -117,6 +128,8 @@ public class DirectoryObserver implements FileListener {
                             files.remove(position);
                             files.add(position, syncedFile);
                         }
+
+                        autoSyncFiles.remove(syncedFile);
                     }
 
                     doAutoSync();
@@ -148,7 +161,7 @@ public class DirectoryObserver implements FileListener {
         if(!remoteNodes.isEmpty()) {
             final String remoteNodeId = remoteNodes.get(0).getId();
 
-            for (File file : files) {
+            for (File file : autoSyncFiles) {
                 if (!file.isDirectory && file.getClass()==File.class) { // file is not syncing, nor synced
                     if(fileFilter==null || fileFilter.autoSync(file)) {
                         Notary.requestFileTransfer(context, file.path, localNodeId, externalObservedPathEncoded, remoteNodeId, false);
