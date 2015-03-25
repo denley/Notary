@@ -88,7 +88,7 @@ public class NotaryWearableListenerService extends WearableListenerService {
 
         for(DataEvent event:dataEvents) {
             final DataItem item = event.getDataItem();
-            if(item.getData().length>0 && localNode !=null && FileTransaction.isFileTransactionItem(item)) {
+            if(item.getData()!=null && item.getData().length>0 && localNode !=null && FileTransaction.isFileTransactionItem(item)) {
                 Notary.notifyListeners(this, new FileTransaction(item));
             }
         }
