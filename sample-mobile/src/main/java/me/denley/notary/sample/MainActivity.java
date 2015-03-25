@@ -53,7 +53,7 @@ public class MainActivity extends ActionBarActivity implements SyncableFileFilte
 
         MainActivityAdapter adapter = new MainActivityAdapter();
         list.setAdapter(adapter);
-        observer = new DirectoryObserver(this, adapter, directory.getAbsolutePath(), null, this, File.SORT_ALPHABETICAL_DIRECTORIES_FIRST);
+        observer = new DirectoryObserver(this, adapter, directory.getAbsolutePath(), null, this, File.SORT_ALPHABETICAL_DIRECTORIES_FIRST, null);
 
         //purge();
     }

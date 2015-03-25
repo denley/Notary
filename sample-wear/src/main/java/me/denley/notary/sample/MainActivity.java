@@ -52,7 +52,7 @@ public class MainActivity extends Activity implements WearableListView.ClickList
 
         adapter = new MainActivityAdapter();
         list.setAdapter(adapter);
-        observer = new DirectoryObserver(this, adapter, directory.getAbsolutePath(), null, this, File.SORT_ALPHABETICAL_DIRECTORIES_FIRST);
+        observer = new DirectoryObserver(this, adapter, directory.getAbsolutePath(), null, this, File.SORT_ALPHABETICAL_DIRECTORIES_FIRST, null);
         list.setClickListener(this);
     }
 

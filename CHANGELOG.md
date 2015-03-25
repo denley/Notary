@@ -2,6 +2,10 @@
 All notable changes to this project will be documented in this file.
 This project adheres to [Semantic Versioning](http://semver.org/).
 
+## 0.2.x
+### Added
+- Callback for `DirectoryObserver` to notify when initial sync is complete
+
 ## 0.1.x
 ### Fixed
 - `DirectoryObserver` now clears the old adapter data before creating more.

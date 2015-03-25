@@ -17,6 +17,10 @@ import java.util.List;
 
 public class DirectoryObserver implements FileListener {
 
+    public interface SyncCallback {
+        public void onSyncComplete();
+    }
+
     @NonNull private final Context context;
 
     @NonNull private final FileListAdapter adapter;
@@ -35,14 +39,17 @@ public class DirectoryObserver implements FileListener {
     @Nullable private final Comparator<File> sorter;
 
     private boolean hasSyncedState = false;
+    @Nullable private final SyncCallback callback;
 
     public DirectoryObserver(@NonNull final Context context, @NonNull final FileListAdapter adapter,
                              @NonNull final String path, @Nullable final String externalPathEncoded,
-                             @Nullable final SyncableFileFilter fileFilter, @Nullable final Comparator<File> sorter) {
+                             @Nullable final SyncableFileFilter fileFilter, @Nullable final Comparator<File> sorter,
+                             @Nullable final SyncCallback callback) {
         this.context = context;
         this.adapter = adapter;
         this.fileFilter = fileFilter;
         this.sorter = sorter;
+        this.callback = callback;
         this.externalObservedPathEncoded = externalPathEncoded!=null?externalPathEncoded:FileTransaction.DEFAULT_DIRECTORY;
         files = adapter.getFiles();
         observedPath = path;
@@ -137,10 +144,24 @@ public class DirectoryObserver implements FileListener {
 
                 hasSyncedState = true;
                 displayUpdatedFileList();
+                if(callback!=null) {
+                    handler.post(new Runnable() {
+                        @Override public void run() {
+                            callback.onSyncComplete();
+                        }
+                    });
+                }
             }
             @Override public void failure(ConnectionResult result) {
                 hasSyncedState = true;
                 displayUpdatedFileList();
+                if(callback!=null) {
+                    handler.post(new Runnable() {
+                        @Override public void run() {
+                            callback.onSyncComplete();
+                        }
+                    });
+                }
             }
         });
     }
