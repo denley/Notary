@@ -9,12 +9,13 @@ import android.util.Log;
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiClient;
 import com.google.android.gms.wearable.Asset;
-import com.google.android.gms.wearable.DataEvent;
 import com.google.android.gms.wearable.DataEventBuffer;
 import com.google.android.gms.wearable.DataItem;
 import com.google.android.gms.wearable.DataItemBuffer;
+import com.google.android.gms.wearable.DataMap;
 import com.google.android.gms.wearable.MessageEvent;
 import com.google.android.gms.wearable.Node;
+import com.google.android.gms.wearable.PutDataMapRequest;
 import com.google.android.gms.wearable.PutDataRequest;
 import com.google.android.gms.wearable.Wearable;
 import com.google.android.gms.wearable.WearableListenerService;
@@ -56,6 +57,23 @@ public class NotaryWearableListenerService extends WearableListenerService {
         }
     }
 
+    private static void updateDiskCapacity(final Context context) {
+        final GoogleApiClient apiClient = new GoogleApiClient.Builder(context)
+                .addApi(Wearable.API).build();
+
+        final ConnectionResult result = apiClient.blockingConnect();
+        if(result.isSuccess()) {
+            final java.io.File file = new java.io.File(FileTransaction.getDefaultDirectory(context));
+
+            final PutDataMapRequest request = PutDataMapRequest.create(Notary.PATH_DISK_CAPACITY);
+            final DataMap map = request.getDataMap();
+            map.putLong("total_space", file.getTotalSpace());
+            map.putLong("available_space", file.getUsableSpace());
+            Wearable.DataApi.putDataItem(apiClient, request.asPutDataRequest());
+            apiClient.disconnect();
+        }
+    }
+
 
     Node localNode;
 
@@ -77,6 +95,7 @@ public class NotaryWearableListenerService extends WearableListenerService {
         if(result.isSuccess()) {
             localNode = Wearable.NodeApi.getLocalNode(apiClient).await().getNode();
             checkAllItems(apiClient);
+            apiClient.disconnect();
         }
     }
 
@@ -88,14 +107,8 @@ public class NotaryWearableListenerService extends WearableListenerService {
             }
         }
         items.release();
-    }
 
-    private void onDataChanged(@NonNull final DataEvent event) {
-        final DataItem item = event.getDataItem();
-
-        if(event.getType()!=DataEvent.TYPE_DELETED && item.getData().length>0 && localNode !=null && FileTransaction.isFileTransactionItem(item)) {
-            onTransactionDataItemChanged(item);
-        }
+        updateDiskCapacity(this);
     }
 
     private void onTransactionDataItemChanged(@NonNull final DataItem item) {
@@ -231,6 +244,7 @@ public class NotaryWearableListenerService extends WearableListenerService {
 
             // Put new transaction
             Wearable.DataApi.putDataItem(apiClient, transaction.asPutDataRequest());
+            apiClient.disconnect();
         } else {
             throw new IllegalStateException("Unable to connect to wearable API");
         }
@@ -266,6 +280,8 @@ public class NotaryWearableListenerService extends WearableListenerService {
                 sendMessage(messageEvent.getSourceNodeId(), Notary.RESPONSE_LIST_FILES, bytes.toByteArray());
             }catch(IOException e) {}
         }
+
+        updateDiskCapacity(this);
     }
 
     private FileListContainer createFileListResponse(@NonNull final String usedDirectory, @Nullable final String requestedDirectory) {

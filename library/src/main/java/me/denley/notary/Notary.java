@@ -27,6 +27,8 @@ public class Notary {
 
     public static final String RESPONSE_LIST_FILES = "/response_list_files";
     public static final String REQUEST_LIST_FILES = "/request_list_files";
+    public static final String PATH_DISK_CAPACITY = "/disk_capacity";
+
 
     private static Map<FileListener, Pair<String, String>> LISTENERS = new LinkedHashMap<>();
 
