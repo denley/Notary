@@ -9,6 +9,7 @@ import android.util.Log;
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiClient;
 import com.google.android.gms.wearable.Asset;
+import com.google.android.gms.wearable.DataEvent;
 import com.google.android.gms.wearable.DataEventBuffer;
 import com.google.android.gms.wearable.DataItem;
 import com.google.android.gms.wearable.DataItemBuffer;
@@ -84,6 +85,14 @@ public class NotaryWearableListenerService extends WearableListenerService {
 
     @Override public void onDataChanged(@NonNull final DataEventBuffer dataEvents) {
         super.onDataChanged(dataEvents);
+
+        for(DataEvent event:dataEvents) {
+            final DataItem item = event.getDataItem();
+            if(item.getData().length>0 && localNode !=null && FileTransaction.isFileTransactionItem(item)) {
+                Notary.notifyListeners(this, new FileTransaction(item));
+            }
+        }
+
         checkAllItems();
     }
 
@@ -100,40 +109,52 @@ public class NotaryWearableListenerService extends WearableListenerService {
     }
 
     private synchronized void checkAllItems(final GoogleApiClient apiClient) {
+        boolean diskStateChanged = false;
+
         final DataItemBuffer items = Wearable.DataApi.getDataItems(apiClient).await();
         for (DataItem item : items) {
             if(item.getData().length>0 && localNode !=null && FileTransaction.isFileTransactionItem(item)) {
-                onTransactionDataItemChanged(item);
+                final boolean actioned = onTransactionDataItemChanged(item);
+                diskStateChanged = actioned || diskStateChanged;
             }
         }
         items.release();
 
-        updateDiskCapacity(this);
-    }
-
-    private void onTransactionDataItemChanged(@NonNull final DataItem item) {
-        final FileTransaction transaction = new FileTransaction(item);
-        Notary.notifyListeners(this, transaction);
-
-        if(transaction.getStatus()==FileTransaction.STATUS_IN_PROGRESS) {
-            checkForActionables(transaction);
+        if(diskStateChanged) {
+            updateDiskCapacity(this);
         }
     }
 
-    private void checkForActionables(@NonNull final FileTransaction transaction) {
+    private boolean onTransactionDataItemChanged(@NonNull final DataItem item) {
+        final FileTransaction transaction = new FileTransaction(item);
+        if(transaction.getStatus()==FileTransaction.STATUS_IN_PROGRESS) {
+            return checkForActionables(transaction);
+        }
+
+        return false;
+    }
+
+    private boolean checkForActionables(@NonNull final FileTransaction transaction) {
+        boolean actioned = false;
+
         if (transaction.pendingCopy()) {
             if(localNode.getId().equals(transaction.sourceNode)) {
                 loadSourceFile(transaction);
+                actioned = true;
             }
         } else if (transaction.pendingSave()) {
             if(localNode.getId().equals(transaction.destinationNode)) {
                 saveDestinationFile(transaction);
+                actioned = true;
             }
         } else if (transaction.pendingDelete()) {
             if(localNode.getId().equals(transaction.sourceNode)) {
                 deleteSourceFile(transaction);
+                actioned = true;
             }
         }
+
+        return actioned;
     }
 
     private void loadSourceFile(@NonNull final FileTransaction transaction) {
