@@ -61,29 +61,33 @@ public class NotaryWearableListenerService extends WearableListenerService {
 
     @Override public void onPeerConnected(Node peer) {
         super.onPeerConnected(peer);
+        checkAllItems();
+    }
 
+    @Override public void onDataChanged(@NonNull final DataEventBuffer dataEvents) {
+        super.onDataChanged(dataEvents);
+        checkAllItems();
+    }
+
+    private synchronized void checkAllItems() {
         final GoogleApiClient apiClient = new GoogleApiClient.Builder(this)
                 .addApi(Wearable.API).build();
 
         final ConnectionResult result = apiClient.blockingConnect();
         if(result.isSuccess()) {
-            final DataItemBuffer items = Wearable.DataApi.getDataItems(apiClient).await();
-            for (DataItem item : items) {
-                if(item.getData().length>0 && localNode !=null && FileTransaction.isFileTransactionItem(item)) {
-                    onTransactionDataItemChanged(item);
-                }
-            }
-            items.release();
+            localNode = Wearable.NodeApi.getLocalNode(apiClient).await().getNode();
+            checkAllItems(apiClient);
         }
     }
 
-    @Override public void onDataChanged(@NonNull final DataEventBuffer dataEvents) {
-        super.onDataChanged(dataEvents);
-        localNode = getLocalNode(this);
-
-        for(DataEvent event:dataEvents) {
-            onDataChanged(event);
+    private synchronized void checkAllItems(final GoogleApiClient apiClient) {
+        final DataItemBuffer items = Wearable.DataApi.getDataItems(apiClient).await();
+        for (DataItem item : items) {
+            if(item.getData().length>0 && localNode !=null && FileTransaction.isFileTransactionItem(item)) {
+                onTransactionDataItemChanged(item);
+            }
         }
+        items.release();
     }
 
     private void onDataChanged(@NonNull final DataEvent event) {

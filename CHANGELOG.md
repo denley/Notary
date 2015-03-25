@@ -5,6 +5,7 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 ## 0.2.x
 ### Added
 - Callback for `DirectoryObserver` to notify when initial sync is complete
+- Transactions are actioned one by one instead of in parallel (fixes some stability issues)
 
 ## 0.1.x
 ### Fixed
