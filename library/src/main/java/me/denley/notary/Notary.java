@@ -39,10 +39,27 @@ public class Notary {
         putTransactionAsync(context, transaction);
     }
 
+    public static void requestFileTransfer(@NonNull final Context context, @NonNull final ArrayList<String> sourceFiles, @NonNull final String sourceNode,
+                                            @NonNull final String destinationDirectory, @NonNull final String destinationNode,
+                                            final boolean deleteSource) {
+        if(!sourceFiles.isEmpty()) {
+            final FileTransaction transaction = new FileTransaction(sourceFiles, sourceNode, destinationDirectory, destinationNode, deleteSource);
+            putTransactionAsync(context, transaction);
+        }
+    }
+
     public static void requestFileDelete(@NonNull final Context context, @NonNull final String file, @NonNull final String node,
                                          @NonNull String observerDirectory, @NonNull String observerNode) {
         final FileTransaction transaction = new FileTransaction(observerDirectory, observerNode, file, node);
         putTransactionAsync(context, transaction);
+    }
+
+    public static void requestFileDelete(@NonNull final Context context, @NonNull final ArrayList<String> files, @NonNull final String node,
+                                          @NonNull String observerDirectory, @NonNull String observerNode) {
+        if(!files.isEmpty()) {
+            final FileTransaction transaction = new FileTransaction(observerDirectory, observerNode, files, node);
+            putTransactionAsync(context, transaction);
+        }
     }
 
     private static void putTransactionAsync(@NonNull final Context context, @NonNull final FileTransaction transaction) {
@@ -95,31 +112,71 @@ public class Notary {
             return;
         }
 
-        final String sourcePath = transaction.getSourceFile(context).getAbsolutePath();
-        final String sourceDirectory = transaction.getSourceFile(context).getParent();
+        final int actionableIndex = transaction.getActionableIndex();
 
-        if(fileOrDirectory.equalsIgnoreCase(sourcePath) || fileOrDirectory.equalsIgnoreCase(sourceDirectory)) {
-            listener.onSourceFileStatusChanged(transaction);
+        if(actionableIndex==0) {
+            for (int i = 0; i < transaction.getSourceFileCount(); i++) {
+                checkAndTriggerSourceForTransactionIndex(context, fileOrDirectory, listener, transaction, i);
+            }
+        } else {
+            checkAndTriggerSourceForTransactionIndex(context, fileOrDirectory, listener, transaction, actionableIndex - 1);
+            if(actionableIndex < transaction.getSourceFileCount()) {
+                checkAndTriggerSourceForTransactionIndex(context, fileOrDirectory, listener, transaction, actionableIndex);
+            }
+        }
+    }
+
+    private static void checkAndTriggerSourceForTransactionIndex(@NonNull Context context,
+                                                                 @NonNull String fileOrDirectory,
+                                                                 @NonNull FileListener listener,
+                                                                 @NonNull FileTransaction transaction,
+                                                                 int index) {
+
+        final String sourcePath = transaction.getSourceFile(context, index).getAbsolutePath();
+        final String sourceDirectory = transaction.getSourceFile(context, index).getParent();
+
+        if (fileOrDirectory.equalsIgnoreCase(sourcePath) || fileOrDirectory.equalsIgnoreCase(sourceDirectory)) {
+            listener.onSourceFileStatusChanged(transaction, index);
         }
     }
 
     private static void checkAndTriggerListenerForDestination(@NonNull Context context,
                                                               @NonNull String fileOrDirectory, @NonNull String node,
                                                               @NonNull FileListener listener, @NonNull FileTransaction transaction) {
-        final File destinationDirectory = transaction.getDestinationDirectoryFile(context);
-
         if(!node.equals(transaction.destinationNode)) {
             return;
         }
 
-        final String sourceFileName = transaction.getSourceFileName();
+        final File destinationDirectory = transaction.getDestinationDirectoryFile(context);
+        final int actionableIndex = transaction.getActionableIndex();
+
+        if(actionableIndex==0) {
+            for (int i = 0; i < transaction.getSourceFileCount(); i++) {
+                checkAndTriggerDestinationForTransactionIndex(context, fileOrDirectory, destinationDirectory, listener, transaction, i);
+            }
+        } else {
+            checkAndTriggerDestinationForTransactionIndex(context, fileOrDirectory, destinationDirectory, listener, transaction, actionableIndex - 1);
+            if(actionableIndex<transaction.getSourceFileCount()) {
+                checkAndTriggerDestinationForTransactionIndex(context, fileOrDirectory, destinationDirectory, listener, transaction, actionableIndex);
+            }
+        }
+    }
+
+    private static void checkAndTriggerDestinationForTransactionIndex(@NonNull Context context,
+                                                                      @NonNull String fileOrDirectory,
+                                                                      @NonNull File destinationDirectory,
+                                                                      @NonNull FileListener listener,
+                                                                      @NonNull FileTransaction transaction,
+                                                                      int index) {
+
+        final String sourceFileName = transaction.getSourceFileName(index);
         final String destinationFileName = new File(destinationDirectory, sourceFileName).getAbsolutePath();
 
         if(fileOrDirectory.equalsIgnoreCase(destinationDirectory.getAbsolutePath()) || fileOrDirectory.equalsIgnoreCase(destinationFileName)) {
-            if(transaction.isDeleteOnlyTransaction && transaction.getStatus()==FileTransaction.STATUS_COMPLETE) {
-                listener.onDeleteTransactionSuccess(transaction);
+            if(transaction.getStatus()==FileTransaction.STATUS_COMPLETE || transaction.getActionableIndex()>index) {
+                listener.onDeleteTransactionSuccess(transaction, index);
             } else {
-                listener.onDestinationFileStatusChanged(transaction);
+                listener.onDestinationFileStatusChanged(transaction, index);
             }
         }
     }
@@ -137,10 +194,13 @@ public class Notary {
             for(DataItem item:items) {
                 if(item.getData().length>0 && FileTransaction.isFileTransactionItem(item)) {
                     final FileTransaction transaction = new FileTransaction(item);
-                    final String sourceDirectory = transaction.getSourceFile(context).getParent();
 
-                    if(node!=null && node.getId().equals(transaction.sourceNode) && directory.equalsIgnoreCase(sourceDirectory)) {
-                        files.add(new PendingFile(directory, transaction));
+                    for (int i = 0; i < transaction.getSourceFileCount(); i++) {
+                        final String sourceDirectory = transaction.getSourceFile(context, i).getParent();
+
+                        if(node!=null && node.getId().equals(transaction.sourceNode) && directory.equalsIgnoreCase(sourceDirectory)) {
+                            files.add(new PendingFile(directory, transaction, i));
+                        }
                     }
                 }
             }

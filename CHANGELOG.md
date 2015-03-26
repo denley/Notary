@@ -7,6 +7,7 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 - Callback for `DirectoryObserver` to notify when initial sync is complete
 - Transactions are actioned one by one instead of in parallel (fixes some stability issues)
 - Now reports disk capacity
+- Batching multiple file transfers into a single transaction
 
 ## 0.1.x
 ### Fixed

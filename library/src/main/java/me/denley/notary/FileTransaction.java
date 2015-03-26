@@ -16,6 +16,7 @@ import com.google.android.gms.wearable.PutDataMapRequest;
 import com.google.android.gms.wearable.PutDataRequest;
 
 import java.io.File;
+import java.util.ArrayList;
 import java.util.UUID;
 
 public class FileTransaction {
@@ -66,6 +67,14 @@ public class FileTransaction {
         return new UUID(System.currentTimeMillis(), (long)(Math.random()*1000000000000l)).toString();
     }
 
+    private static ArrayList<String> asArrayList(String... strings) {
+        final ArrayList<String> asList = new ArrayList<>();
+        for(String item:strings) {
+            asList.add(item);
+        }
+        return asList;
+    }
+
     public static final int STATUS_IN_PROGRESS = 0;
     public static final int STATUS_COMPLETE = 1;
     public static final int STATUS_CANCELED = 3;
@@ -90,12 +99,13 @@ public class FileTransaction {
     public @interface FileTransactionStatus {}
 
 
-    @NonNull private final String sourceFile;
+    @NonNull private final ArrayList<String> sourceFiles;
     @NonNull public final String sourceNode;
 
     @NonNull private final String destinationDirectory;
     @NonNull public final String destinationNode;
 
+    private int actionableIndex = 0;
     private boolean shouldCopy = false;
     private boolean hasCopied = false;
     private boolean shouldDelete = false;
@@ -110,7 +120,11 @@ public class FileTransaction {
     @Nullable Asset fileAsset;
 
     FileTransaction(@NonNull String sourceFile, @NonNull String sourceNode, @NonNull String destinationDirectory, @NonNull String destinationNode, boolean deleteSource) {
-        this.sourceFile = sourceFile;
+        this(asArrayList(sourceFile), sourceNode, destinationDirectory, destinationNode, deleteSource);
+    }
+
+    FileTransaction(@NonNull ArrayList<String> sourceFiles, @NonNull String sourceNode, @NonNull String destinationDirectory, @NonNull String destinationNode, boolean deleteSource) {
+        this.sourceFiles = sourceFiles;
         this.sourceNode = sourceNode;
         this.destinationDirectory = destinationDirectory;
         this.destinationNode = destinationNode;
@@ -123,7 +137,11 @@ public class FileTransaction {
     }
 
     FileTransaction(@NonNull String observerDirectory, @NonNull String observerNode, @NonNull String fileToDelete, @NonNull String node) {
-        sourceFile = fileToDelete;
+        this(observerDirectory, observerNode, asArrayList(fileToDelete), node);
+    }
+
+    FileTransaction(@NonNull String observerDirectory, @NonNull String observerNode, @NonNull ArrayList<String> filesToDelete, @NonNull String node) {
+        sourceFiles = filesToDelete;
         sourceNode = node;
         destinationDirectory = observerDirectory;
         destinationNode = observerNode;
@@ -141,10 +159,11 @@ public class FileTransaction {
 
     @SuppressWarnings("ResourceType")
     private FileTransaction(@NonNull DataMap map) {
-        sourceFile = map.getString("sourceFile");
+        sourceFiles = map.getStringArrayList("sourceFiles");
         sourceNode = map.getString("sourceNode");
         destinationDirectory = map.getString("destinationDirectory");
         destinationNode = map.getString("destinationNode");
+        actionableIndex = map.getInt("actionableIndex");
         shouldCopy = map.getBoolean("shouldCopy");
         hasCopied = map.getBoolean("hasCopied");
         shouldDelete = map.getBoolean("shouldDelete");
@@ -159,10 +178,11 @@ public class FileTransaction {
         final PutDataMapRequest request = PutDataMapRequest.create(PATH_PREFIX_TRANSACTION + transactionId);
 
         final DataMap map = request.getDataMap();
-        map.putString("sourceFile", sourceFile);
+        map.putStringArrayList("sourceFiles", sourceFiles);
         map.putString("sourceNode", sourceNode);
         map.putString("destinationDirectory", destinationDirectory);
         map.putString("destinationNode", destinationNode);
+        map.putInt("actionableIndex", actionableIndex);
         map.putBoolean("shouldCopy", shouldCopy);
         map.putBoolean("hasCopied", hasCopied);
         map.putBoolean("shouldDelete", shouldDelete);
@@ -188,7 +208,7 @@ public class FileTransaction {
         fileAsset = null;
 
         if(!shouldDelete) {
-            updateStatus(STATUS_COMPLETE);
+            setCurrentIndexComplete();
         }
     }
 
@@ -200,19 +220,34 @@ public class FileTransaction {
         }
         hasDeleted = true;
 
-        updateStatus(STATUS_COMPLETE);
+        setCurrentIndexComplete();
+    }
+
+    private void setCurrentIndexComplete() {
+        actionableIndex++;
+        if(actionableIndex < sourceFiles.size()) {
+            hasCopied = false;
+            hasDeleted = false;
+            fileAsset = null;
+        } else {
+            updateStatus(STATUS_COMPLETE);
+        }
+    }
+
+    int getActionableIndex() {
+        return actionableIndex;
     }
 
     boolean pendingCopy() {
-        return shouldCopy && !hasCopied && fileAsset==null;
+        return actionableIndex<sourceFiles.size() && shouldCopy && !hasCopied && fileAsset==null;
     }
 
     boolean pendingSave() {
-        return shouldCopy && !hasCopied && fileAsset!=null;
+        return actionableIndex<sourceFiles.size() && shouldCopy && !hasCopied && fileAsset!=null;
     }
 
     boolean pendingDelete() {
-        return (!shouldCopy || hasCopied) && shouldDelete && !hasDeleted;
+        return actionableIndex<sourceFiles.size() && (!shouldCopy || hasCopied) && shouldDelete && !hasDeleted;
     }
 
     boolean hasCopiedAndSaved() {
@@ -231,12 +266,24 @@ public class FileTransaction {
         return PATH_PREFIX_TRANSACTION + transactionId;
     }
 
-    @NonNull public String getSourceFileName() {
-        return new File(sourceFile).getName();
+    @NonNull public String getSourceFileName(int index) {
+        return new File(sourceFiles.get(index)).getName();
     }
 
-    @NonNull public File getSourceFile(@NonNull final Context context) {
-        return new File(normalizePath(context, sourceFile));
+    @NonNull public String getActionableSourceFileName() {
+        return new File(sourceFiles.get(actionableIndex)).getName();
+    }
+
+    public int getSourceFileCount() {
+        return sourceFiles.size();
+    }
+
+    @NonNull public File getSourceFile(@NonNull final Context context, int index) {
+        return new File(normalizePath(context, sourceFiles.get(index)));
+    }
+
+    @NonNull public File getActionableSourceFile(@NonNull final Context context) {
+        return new File(normalizePath(context, sourceFiles.get(actionableIndex)));
     }
 
     @NonNull public File getDestinationDirectoryFile(@NonNull Context context) {

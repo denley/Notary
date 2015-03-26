@@ -4,8 +4,8 @@ public class PendingFile extends File {
 
     public final FileTransaction transaction;
 
-    PendingFile(String directory, FileTransaction transaction) {
-        super(new java.io.File(directory, transaction.getSourceFileName()).getAbsolutePath(), false, false, false);
+    PendingFile(String directory, FileTransaction transaction, int sourceFileIndex) {
+        super(new java.io.File(directory, transaction.getSourceFileName(sourceFileIndex)).getAbsolutePath(), false, false, false);
         this.transaction = transaction;
     }
 

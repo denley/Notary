@@ -238,26 +238,26 @@ public class DirectoryObserver implements FileListener {
         }
     }
 
-    @Override public void onSourceFileStatusChanged(final FileTransaction transaction) {
+    @Override public void onSourceFileStatusChanged(final FileTransaction transaction, final int indexUpdated) {
         handler.post(new Runnable() {
             public void run() {
-                updateForTransaction(transaction);
+                updateForTransaction(transaction, indexUpdated);
             }
         });
     }
 
-    @Override public void onDestinationFileStatusChanged(final FileTransaction transaction) {
+    @Override public void onDestinationFileStatusChanged(final FileTransaction transaction, final int indexUpdated) {
         handler.post(new Runnable() {
             public void run() {
-                updateForTransaction(transaction);
+                updateForTransaction(transaction, indexUpdated);
             }
         });
     }
 
-    @Override public void onDeleteTransactionSuccess(final FileTransaction transaction) {
+    @Override public void onDeleteTransactionSuccess(final FileTransaction transaction, final int indexUpdated) {
         handler.post(new Runnable() {
             public void run() {
-                final File file = new File(observedPath, transaction.getSourceFileName());
+                final File file = new File(observedPath, transaction.getSourceFileName(indexUpdated));
 
                 if(files.contains(file)) {
                     final int position = files.indexOf(file);
@@ -269,12 +269,12 @@ public class DirectoryObserver implements FileListener {
         });
     }
 
-    private void updateForTransaction(FileTransaction transaction) {
+    private void updateForTransaction(final FileTransaction transaction, final int indexUpdated) {
         final File file;
-        if(transaction.getStatus()==FileTransaction.STATUS_COMPLETE) {
-            file = new SyncedFile(observedPath, transaction);
+        if(transaction.getStatus()==FileTransaction.STATUS_COMPLETE || indexUpdated < transaction.getActionableIndex()) {
+            file = new SyncedFile(observedPath, transaction, indexUpdated);
         } else {
-            file = new PendingFile(observedPath, transaction);
+            file = new PendingFile(observedPath, transaction, indexUpdated);
         }
 
         final int position = files.indexOf(file);
