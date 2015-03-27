@@ -18,7 +18,7 @@ public abstract class FileListAdapter extends RecyclerView.Adapter {
     }
 
     @Override public int getItemCount() {
-        return Math.max(1, files.size());
+        return files.size();
     }
 
 }
