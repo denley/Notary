@@ -323,8 +323,7 @@ public class NotaryWearableListenerService extends WearableListenerService {
         final FileListContainer response = new FileListContainer();
         response.directory = requestedDirectory;
 
-        directoryFile.mkdirs();
-        if(!directoryFile.isDirectory()) {
+        if(directoryFile.exists() && !directoryFile.isDirectory()) {
             response.outcome = FileListContainer.ERROR_DIRECTORY_NOT_FOUND;
         } else {
             File[] contents = directoryFile.listFiles();

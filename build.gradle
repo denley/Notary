@@ -22,5 +22,5 @@ ext {
     PACKAGE_NAME = 'me.denley.notary'
     ARTIFACT_NAME = 'notary'
     VERSION_CODE = 14
-    VERSION_NAME = '0.2.16'
+    VERSION_NAME = '0.2.17'
 }
