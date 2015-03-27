@@ -1,7 +1,10 @@
 package me.denley.notary;
 
 import android.content.Context;
+import android.os.Handler;
+import android.os.Looper;
 import android.support.annotation.NonNull;
+import android.text.format.DateUtils;
 import android.util.Log;
 import android.util.Pair;
 
@@ -257,17 +260,25 @@ public class Notary {
     }
 
     private static void requestFileList(@NonNull final GoogleApiClient apiClient, @NonNull final String node, @NonNull final String directory, @NonNull final FileListCallback callback) {
+        final Handler handler = new Handler(Looper.getMainLooper());
+        final Runnable requestRunnable = new Runnable() {
+            @Override public void run() {
+                Wearable.MessageApi.sendMessage(apiClient, node, REQUEST_LIST_FILES, directory.getBytes());
+                handler.postDelayed(this, 10 * DateUtils.SECOND_IN_MILLIS);
+            }
+        };
+
         Wearable.MessageApi.addListener(apiClient, new MessageApi.MessageListener() {
             @Override public void onMessageReceived(MessageEvent messageEvent) {
                 if(messageEvent.getPath().equals(RESPONSE_LIST_FILES) && messageEvent.getSourceNodeId().equals(node)) {
-                    Log.d("WearApi", "File listing response received");
                     try {
                         final ObjectInputStream in = new ObjectInputStream(new ByteArrayInputStream(messageEvent.getData()));
                         final FileListContainer container = (FileListContainer)in.readObject();
                         if((directory.equalsIgnoreCase(container.directory))) {
-                            Log.d("WearApi", "File list success");
+                            handler.removeCallbacks(requestRunnable);
                             callback.success(container);
                             Wearable.MessageApi.removeListener(apiClient, this);
+                            apiClient.disconnect();
                         }
                     } catch (Exception e) {
                         Log.e("WearApi", "Error parsing file list response", e);
@@ -275,7 +286,8 @@ public class Notary {
                 }
             }
         });
-        Wearable.MessageApi.sendMessage(apiClient, node, REQUEST_LIST_FILES, directory.getBytes());
+
+        handler.post(requestRunnable);
     }
 
 }

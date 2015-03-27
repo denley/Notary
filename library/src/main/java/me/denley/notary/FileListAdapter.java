@@ -9,7 +9,7 @@ public abstract class FileListAdapter extends RecyclerView.Adapter {
 
     private final List<File> files = new ArrayList<>();
 
-    List<File> getFiles(){
+    protected List<File> getFiles(){
         return files;
     }
 
@@ -18,7 +18,7 @@ public abstract class FileListAdapter extends RecyclerView.Adapter {
     }
 
     @Override public int getItemCount() {
-        return files.size();
+        return Math.max(1, files.size());
     }
 
 }

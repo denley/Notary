@@ -8,6 +8,7 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 - Transactions are actioned one by one instead of in parallel (fixes some stability issues)
 - Now reports disk capacity
 - Batching multiple file transfers into a single transaction
+- Retry file list requests every 10 seconds
 
 ## 0.1.x
 ### Fixed
