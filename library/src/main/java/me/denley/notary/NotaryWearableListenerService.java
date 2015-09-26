@@ -4,6 +4,7 @@ import android.content.Context;
 import android.net.Uri;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
+import android.support.annotation.WorkerThread;
 import android.util.Log;
 
 import com.google.android.gms.common.ConnectionResult;
@@ -34,6 +35,7 @@ import java.util.List;
 
 public class NotaryWearableListenerService extends WearableListenerService {
 
+    @WorkerThread
     @Nullable public static Node getLocalNode(final Context context) {
         final GoogleApiClient apiClient = new GoogleApiClient.Builder(context)
                 .addApi(Wearable.API).build();
@@ -46,6 +48,7 @@ public class NotaryWearableListenerService extends WearableListenerService {
         }
     }
 
+    @WorkerThread
     @NonNull public static List<Node> getRemoteNodes(final Context context) {
         final GoogleApiClient apiClient = new GoogleApiClient.Builder(context)
                 .addApi(Wearable.API).build();
@@ -58,6 +61,7 @@ public class NotaryWearableListenerService extends WearableListenerService {
         }
     }
 
+    @WorkerThread
     private static void updateDiskCapacity(final Context context) {
         final GoogleApiClient apiClient = new GoogleApiClient.Builder(context)
                 .addApi(Wearable.API).build();
@@ -108,6 +112,7 @@ public class NotaryWearableListenerService extends WearableListenerService {
         }
     }
 
+    @WorkerThread
     private void checkAllItems() {
         final GoogleApiClient apiClient = new GoogleApiClient.Builder(this)
                 .addApi(Wearable.API).build();
@@ -261,6 +266,7 @@ public class NotaryWearableListenerService extends WearableListenerService {
         updateTransaction(transaction);
     }
 
+    @WorkerThread
     private void updateTransaction(@NonNull final FileTransaction transaction) {
         final GoogleApiClient apiClient = new GoogleApiClient.Builder(this)
                 .addApi(Wearable.API).build();
@@ -283,6 +289,7 @@ public class NotaryWearableListenerService extends WearableListenerService {
         }
     }
 
+    @WorkerThread
     private InputStream openAssetInputStream(@NonNull final Asset asset) {
         final GoogleApiClient apiClient = new GoogleApiClient.Builder(this)
                 .addApi(Wearable.API).build();
@@ -341,6 +348,7 @@ public class NotaryWearableListenerService extends WearableListenerService {
         return response;
     }
 
+    @WorkerThread
     private void sendMessage(@NonNull final String node, @NonNull final String path, @NonNull final byte[] data) {
         final GoogleApiClient apiClient = new GoogleApiClient.Builder(this)
                 .addApi(Wearable.API).build();

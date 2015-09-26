@@ -219,8 +219,8 @@ public class Notary {
 
 
     public interface FileListCallback {
-        public void success(FileListContainer fileList);
-        public void failure(ConnectionResult result);
+        void success(FileListContainer fileList);
+        void failure(ConnectionResult result);
     }
 
     public static void requestFileList(@NonNull final Context context, @NonNull final FileListCallback callback) {

@@ -6,6 +6,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
+import android.support.annotation.WorkerThread;
 
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.wearable.Node;
@@ -178,18 +179,22 @@ public class DirectoryObserver implements FileListener {
     }
 
     private void doAutoSync() {
-        final List<Node> remoteNodes = NotaryWearableListenerService.getRemoteNodes(context);
-        if(!remoteNodes.isEmpty()) {
-            final String remoteNodeId = remoteNodes.get(0).getId();
+        new Thread() {
+            public void run() {
+                final List<Node> remoteNodes = NotaryWearableListenerService.getRemoteNodes(context);
+                if(!remoteNodes.isEmpty()) {
+                    final String remoteNodeId = remoteNodes.get(0).getId();
 
-            for (File file : autoSyncFiles) {
-                if (!file.isDirectory && file.getClass()==File.class) { // file is not syncing, nor synced
-                    if(fileFilter==null || fileFilter.autoSync(file)) {
-                        Notary.requestFileTransfer(context, file.path, localNodeId, externalObservedPathEncoded, remoteNodeId, false);
+                    for (File file : autoSyncFiles) {
+                        if (!file.isDirectory && file.getClass()==File.class) { // file is not syncing, nor synced
+                            if(fileFilter==null || fileFilter.autoSync(file)) {
+                                Notary.requestFileTransfer(context, file.path, localNodeId, externalObservedPathEncoded, remoteNodeId, false);
+                            }
+                        }
                     }
                 }
             }
-        }
+        }.start();
     }
 
     private synchronized void onFileSystemEvent(int event, String path) {
